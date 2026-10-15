@@ -1,0 +1,9 @@
+# Historical files are retained locally and never uploaded by Pages.
+archive/
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
