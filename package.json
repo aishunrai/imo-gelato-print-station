@@ -1,12 +1,13 @@
 {
   "name": "imo-gelato-quality",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "engines": {"node": ">=20"},
   "scripts": {
-    "build": "node scripts/bundle.mjs",
-    "test": "node --test apps/label-print/tests/*.test.mjs",
+    "build": "node scripts/bundle.mjs && node scripts/bundle-scale.mjs",
+    "test": "node --test apps/label-print/tests/*.test.mjs apps/scale-print/tests/*.test.mjs",
+    "package:pages": "node scripts/package-pages.mjs",
     "dev": "node scripts/serve.mjs"
   }
 }

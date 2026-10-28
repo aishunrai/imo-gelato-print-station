@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'apps/label-print/**'
+      - 'apps/scale-print/**'
       - 'scripts/**'
       - 'package.json'
       - '.github/workflows/pages.yml'
@@ -23,10 +24,11 @@ jobs:
           node-version: '22'
       - run: npm run build
       - run: npm test
+      - run: npm run package:pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: apps/label-print/public
+          path: dist-pages
   deploy:
     needs: test-and-package
     runs-on: ubuntu-latest
