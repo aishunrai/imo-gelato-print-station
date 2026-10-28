@@ -142,7 +142,7 @@ test('actual print handler fixes a stale failed connection display and sends exa
   assert.equal(app.get('connection-title').textContent, '状態を確認できません');
   app.fill(); await app.print();
   assert.equal(app.get('connection-title').textContent, '印刷応答を確認しました');
-  assert.equal(app.get('printer-chip').dataset.state, 'confirmed');
+  assert.equal(app.get('connection-card').dataset.state, 'confirmed');
   assert.equal(app.rows()[0].status, 'success');
   assert.deepEqual(requests, ['/getstatus','/print']);
 });
@@ -155,9 +155,9 @@ test('returning from Smooth Print checks only status and does not lose prior pri
   });
   app.fill(); await app.print();
   await app.visibility('hidden');
-  assert.equal(app.get('printer-chip').dataset.state, 'unverified');
+  assert.equal(app.get('connection-card').dataset.state, 'unverified');
   await app.visibility('visible');
-  assert.equal(app.get('printer-chip').dataset.state, 'unknown');
+  assert.equal(app.get('connection-card').dataset.state, 'unknown');
   assert.match(app.get('connection-detail').textContent, /前回の応答確認/);
   assert.equal(app.rows()[0].status, 'success');
   assert.deepEqual(requests, ['/print','/getstatus']);
@@ -173,7 +173,7 @@ test('demo does not contact the printer or overwrite actual connection evidence'
   assert.equal(count, 1);
   assert.equal(app.get('connection-card').dataset.state, 'demo');
   await app.click('demo-toggle');
-  assert.equal(app.get('printer-chip').dataset.state, 'unverified');
+  assert.equal(app.get('connection-card').dataset.state, 'unverified');
   assert.deepEqual(app.rows(), []);
 });
 test('printer errors update the card while leaving uncertain print locked against duplicate submission', async () => {

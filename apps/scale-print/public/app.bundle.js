@@ -478,7 +478,6 @@ function renderConnection() {
   text('connection-title', view.title);
   text('connection-detail', view.detail);
   $('connection-card').dataset.state = view.kind;
-  $('printer-chip').dataset.state = view.kind;
 }
 function setConnection(event, details) {
   connection = connectionEvent(connection, event, details);
@@ -678,7 +677,6 @@ prepareSheetLogs(records,cloudProject());
 // A recovered interrupted print has a new outcome that must also reach the DB.
 for (const row of records) if (row.sheets && Array.isArray(storedHistory) && storedHistory.some(old => old?.id === row.id && old.status === 'pending')) markLogChanged(row, cloudProject());
 save('storage-check', true); persist();
-$('device-note').hidden = android;
 updatePreview(); renderHistory(); renderConnection();
 renderScale();
 const {minG, maxG} = weightLimits(WEIGHT_RULE);

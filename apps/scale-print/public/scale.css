@@ -1,1 +1,60 @@
-.trial-banner{padding:14px 18px;margin:0 0 24px;background:#edf1e9;border:1px solid #d7dfd1;border-radius:10px;font-size:13px;line-height:1.8}.trial-banner a{color:#354a36;display:inline-block;margin-left:12px;font-weight:600}.scale-card{padding:26px 30px;margin:0 0 26px;border-left:4px solid #80917e}.scale-card[data-state="connected"]{border-left-color:#426d46}.scale-toolbar{display:flex;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:20px}.scale-mode{min-width:190px;flex:0 1 230px}.scale-mode label{display:block;margin:0 0 7px}.scale-mode select{margin:0}.scale-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.scale-buttons button{min-height:44px}.scale-badge{padding:7px 12px;background:#eff2eb;border-radius:20px;font-size:12px;white-space:nowrap}.scale-card strong{display:block;font-size:16px}.scale-card p{font-size:13px;line-height:1.8;margin:8px 0}.scale-meta{color:#56664e}.scale-help{color:#586156}.scale-card details{border-top:1px solid #e3e7df;padding-top:12px;margin-top:14px}.scale-card pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f5ef;padding:12px;border-radius:6px;font-size:12px}.weight-input input[readonly]{background:#f1f4ee;color:#243d26}@media(max-width:650px){.scale-card{padding:22px 18px}.trial-banner a{margin-left:0;display:block}.scale-toolbar{gap:14px}.scale-mode{flex-basis:100%}.scale-buttons{width:100%}.scale-buttons .secondary{flex:1;min-width:135px}.scale-badge{display:none}}
+/* Layout overrides apply only to the separate scale printing page. */
+.topbar{height:auto;min-height:88px;gap:20px;padding-top:20px;padding-bottom:20px}
+.site-title{margin:0;font:inherit;line-height:1.4}
+.brand{font-size:clamp(18px,2.1vw,23px);letter-spacing:.02em}
+.edition{flex-shrink:0}
+.trial-banner{padding:14px 18px;margin:0 0 24px;background:#edf1e9;border:1px solid #d7dfd1;border-radius:10px;font-size:13px;line-height:1.8}
+.trial-banner a{color:#354a36;display:inline-block;margin-left:12px;font-weight:600}
+.form-card{width:100%}
+#label-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 28px}
+#label-form>div{min-width:0}
+#label-form .field-row,#label-form .weight-field{margin-top:0}
+.print-actions{display:flex;flex-direction:column;justify-content:center}
+.print-actions .retain-note{margin:0 0 18px}
+.print-actions .button-note{margin:10px 0 0}
+.form-card>.result{margin-top:22px}
+.workspace{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:24px}
+.workspace>*{min-width:0}
+.workspace .aside{gap:18px;min-width:0}
+.scale-card{padding:24px;margin:0;border-left:4px solid #80917e}
+.scale-card[data-state="connected"]{border-left-color:#426d46}
+.scale-card .card-heading{margin-bottom:18px}
+.scale-toolbar{display:grid;gap:12px;margin-bottom:20px}
+.scale-mode{min-width:0}
+.scale-mode label{display:block;margin:0 0 7px}
+.scale-mode select{margin:0}
+.scale-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.scale-buttons button{min-height:44px}
+.scale-buttons .secondary{flex:1}
+.scale-buttons .text-button{padding:8px 4px}
+.scale-badge{padding:7px 12px;background:#eff2eb;border-radius:20px;font-size:12px;white-space:nowrap}
+.scale-card strong{display:block;font-size:16px}
+.scale-card p{font-size:13px;line-height:1.8;margin:8px 0;overflow-wrap:anywhere}
+.scale-meta{color:#56664e}
+.scale-help{color:#586156}
+.scale-card details{border-top:1px solid #e3e7df;padding-top:12px;margin-top:14px}
+.scale-card pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f5ef;padding:12px;border-radius:6px;font-size:12px}
+.weight-input input[readonly]{background:#f1f4ee;color:#243d26}
+.connection-top>div{min-width:0}
+.connection-top h2{font-size:15px;font-weight:600}
+.connection-top #connection-title{font-size:12px;margin:7px 0 0;overflow-wrap:anywhere}
+.connection-top .secondary{flex-shrink:0;min-height:44px}
+.connection-card details{overflow-wrap:anywhere}
+@media(max-width:900px){
+  .workspace{gap:18px}
+  #label-form{gap:20px}
+  .scale-card{padding:20px}
+  .scale-badge{display:none}
+}
+@media(max-width:699px){
+  .topbar{align-items:flex-start;flex-direction:column;gap:8px}
+  .edition{max-width:none;text-align:left}
+  .brand{font-size:18px}
+  .trial-banner a{margin-left:0;display:block}
+  #label-form{grid-template-columns:1fr}
+  .form-card{padding:22px}
+  .print-actions .retain-note{margin:0 0 16px}
+  .workspace{grid-template-columns:1fr;gap:18px;margin-top:18px}
+  .scale-card{padding:22px 18px}
+  .scale-buttons .secondary{min-width:115px}
+}

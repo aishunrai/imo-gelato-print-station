@@ -5,31 +5,21 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#354a36">
   <meta name="description" content="AndroidのWeb画面で続けて操作できる、いもんねのジェラートラベル印刷試験ページ。">
-  <title>スケール連携テスト｜いもんね</title>
+  <title>いもんね ジェラートラベル印刷</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="weight.css">
   <link rel="stylesheet" href="cloud.css">
-  <link rel="stylesheet" href="scale.css">
+  <link rel="stylesheet" href="scale.css?v=20261028-layout">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="./" aria-label="ジェラートラベル印刷 ホーム"><span class="brand-mark">i</span><span>いもんね<small>GELATO WORKSHOP</small></span></a><span class="edition">スケール連携 / テスト版</span></header>
+  <header class="topbar"><h1 class="site-title"><a class="brand" href="./">いもんね ジェラートラベル印刷</a></h1><span class="edition">スケール連携 / テスト版</span></header>
   <main>
     <div class="trial-banner">スケール連携のテスト版です。履歴と保存設定は従来のページと分かれています。<a href="../">従来の印刷ページを開く ↗</a></div>
-    <div class="intro"><div><span class="eyebrow">LABEL STATION</span><h1>ラベルを、すぐ次へ。</h1><p>フレーバーを選んで印刷。この画面のまま、次のケースへ。</p></div><span id="printer-chip" class="printer-chip" data-state="unverified"><span class="dot"></span>Brother QL-820NWB</span></div>
-    <div id="device-note" class="device-note" hidden>実機印刷は、Smooth Printを設定したAndroidタブレットでご利用ください。PCでは「画面を試す」で操作を確認できます。</div>
-    <section id="scale-card" class="card scale-card" aria-labelledby="scale-heading" data-state="disconnected">
-      <div class="card-heading"><div><span class="eyebrow">TL-280 / USB</span><h2 id="scale-heading">スケールから重量を取得</h2></div><span class="scale-badge">正味重量 Wg</span></div>
-      <div class="scale-toolbar"><div class="scale-mode"><label for="weight-mode">重量の取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div><div class="scale-buttons"><button id="scale-connect" class="secondary" type="button">スケールを接続</button><button id="scale-arm" class="secondary" type="button">次の計量を開始</button><button id="scale-disconnect" class="text-button" type="button">切断</button></div></div>
-      <strong id="scale-title" role="status" aria-live="polite">スケール未接続</strong><p id="scale-message" role="status" aria-live="polite">スケールを接続してください。</p><p id="scale-tare" class="scale-meta">受信したWgを正味重量として使用します。</p>
-      <p class="scale-help">先にSerial USB Terminalの接続を解除し、このページの「スケールを接続」からFTDI機器を選んでください。空ケースを風袋引きしてから中身を入れ、表示が安定するまで待ちます。</p>
-      <details><summary>受信の仕組み・診断情報</summary><p id="scale-support"></p><p>TL-280は安定した計量結果を送ります。重量が連続して動く表示ではありません。受信から30秒経過、画面を離れたとき、印刷開始時、USB切断時は重量を解除します。次のケースは「次の計量を開始」を押して載せ替え・再計量してください。物を下ろしたことは自動検出できません。</p><p>風袋量Ptは確認用です。Wgから二重に差し引きません。端末がUSBをChromeへ渡せない場合は直接受信できないため、下の情報を共有してください。</p><pre id="scale-diagnostics">まだ受信していません。</pre></details>
-    </section>
-    <div class="workspace">
       <section class="card form-card" aria-labelledby="form-title">
-        <div class="card-heading"><h2 id="form-title"><span class="step">01</span>印刷する情報</h2><button id="demo-toggle" class="text-button" type="button" aria-pressed="false">画面を試す</button></div>
+        <div class="card-heading"><h2 id="form-title"><span class="step">01</span>内容入力</h2><button id="demo-toggle" class="text-button" type="button" aria-pressed="false">画面を試す</button></div>
         <div id="demo-note" class="demo-note" hidden>画面確認モードです。プリンタには送信しません。</div>
         <form id="label-form">
-          <label for="flavor">フレーバー<span>必須</span></label>
+          <div class="flavor-field"><label for="flavor">フレーバー<span>必須</span></label>
           <select id="flavor" name="flavor" required>
             <option value="">選択してください</option>
             <option value="ピスタチオ">ピスタチオ</option>
@@ -47,19 +37,27 @@
             <option value="マンゴー">マンゴー</option>
             <option value="和栗">和栗</option>
             <option value="黒胡麻きなこ">黒胡麻きなこ</option>
-          </select>
+          </select></div>
           <div class="field-row"><div><label for="staff">担当者<span>必須</span></label><input id="staff" name="staff" type="text" maxlength="40" placeholder="担当者名" autocomplete="name" required></div><div class="copies-field"><label for="copies">印刷枚数</label><input id="copies" name="copies" type="number" min="1" max="50" step="1" value="1" inputmode="numeric" required></div></div>
           <div class="weight-field"><label for="weight">正味重量<span id="weight-source-label">必須・スケール自動取得</span></label><div class="weight-input"><input id="weight" name="weight" type="number" min="1" step="1" inputmode="numeric" placeholder="スケールから取得" autocomplete="off" aria-describedby="weight-help weight-range weight-judgment" required readonly><span>g</span></div><p id="weight-help">空ケースを風袋引きしてから計量してください。</p><p id="weight-range"></p><p id="weight-judgment" class="weight-judgment" role="status" aria-live="polite" data-state="empty">正味重量を取得してください。</p></div>
-          <p class="retain-note">フレーバー・担当者は保持します。次のケースは「次の計量を開始」から計量してください。</p>
+          <div class="print-actions"><p class="retain-note">フレーバー・担当者は保持します。次のケースは「次の計量を開始」から計量してください。</p>
           <button id="print-button" class="primary" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 9V3h12v6M6 17H4V9h16v8h-2M6 14h12v7H6zM16 11h1"/></svg><span id="print-button-text">ラベルを印刷</span><span class="arrow" aria-hidden="true">↗</span></button>
-          <p class="button-note" id="button-note">印刷結果は、この画面に表示されます。</p>
+          <p class="button-note" id="button-note">印刷結果は、この画面に表示されます。</p></div>
         </form>
         <div id="result" class="result" role="status" aria-live="polite"><span class="result-icon" aria-hidden="true">○</span><div><strong id="result-title">印刷の準備</strong><p id="result-detail">最初に「接続確認」でプリンタの応答を確認してください。</p></div></div>
         <div id="reconcile" class="reconcile" hidden><p>ラベルの出力を確認して、次の操作を選んでください。途中まで出た場合は、不要なラベルを処理してから再発行します。</p><button id="confirm-printed" type="button" class="secondary">必要枚数の印刷を確認</button><button id="confirm-not-printed" type="button" class="text-button">未完了・再発行が必要</button></div>
       </section>
-      <aside class="aside">
+    <div class="workspace">
         <section class="card preview-card" aria-labelledby="preview-title"><div class="card-heading"><h2 id="preview-title"><span class="step">02</span>ラベル内容</h2><span class="dimension">62 × 29 mm</span></div><div class="label-bed"><div class="paper-label"><span class="label-tiny">GELATO</span><strong id="preview-flavor">フレーバー</strong><div class="label-line"><span>製造</span><span id="preview-manufactured-at">発行時に自動取得</span></div><div class="label-line"><span>正味重量</span><span id="preview-weight">未入力</span></div><div class="label-bottom"><span>担当者</span><span id="preview-staff">未入力</span></div></div></div><p class="preview-note" id="preview-caption">入力内容の確認用です。製造日時は発行時に確定します。</p><div class="preview-meta"><span>印刷する枚数</span><strong><span id="preview-copies">1</span><small> 枚</small></strong></div></section>
-        <section id="connection-card" class="card connection-card" data-state="unverified"><div class="connection-top"><div aria-live="polite" role="status"><span class="eyebrow">PRINTER</span><h2 id="connection-title">接続は未確認です</h2></div><button id="check-button" type="button" class="secondary">接続確認</button></div><p id="connection-detail">同じAndroid端末のSmooth Printと通信します。</p><details><summary>初回の準備・接続できないとき</summary><ol><li>AndroidにSmooth Printをインストールし、QL-820NWBを設定します。</li><li>新しい <b>gelato-label-v2.lbx</b> をダウンロードし、Smooth Printへ共有します。旧テンプレートでは日時・重量を印字できません。</li><li>このページをAndroidのChromeで開き、接続確認を押します。</li><li>Chromeが端末内通信の許可を求めた場合は、内容を確認して許可します。</li></ol><p>応答がない場合は、Smooth Printを起動して設定を確認し、このページに戻って再度接続確認を行います。</p><a href="assets/labels/gelato-label-v2.lbx" download="gelato-label-v2.lbx">日時・重量対応ラベルをダウンロード ↧</a><p class="tech-note">接続先：localhost:8088 ／ 印刷内容：FLAVOR・STAFF・MANUFACTURED_AT・WEIGHT</p></details></section>
+      <aside class="aside" aria-label="機器との接続">
+        <section id="scale-card" class="card scale-card" aria-labelledby="scale-heading" data-state="disconnected">
+          <div class="card-heading"><div><span class="eyebrow">TL-280 / USB</span><h2 id="scale-heading">スケールとの接続</h2></div><span class="scale-badge">正味重量 Wg</span></div>
+          <div class="scale-toolbar"><div class="scale-mode"><label for="weight-mode">重量の取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div><div class="scale-buttons"><button id="scale-connect" class="secondary" type="button">スケールを接続</button><button id="scale-arm" class="secondary" type="button">次の計量を開始</button><button id="scale-disconnect" class="text-button" type="button">切断</button></div></div>
+          <strong id="scale-title" role="status" aria-live="polite">スケール未接続</strong><p id="scale-message" role="status" aria-live="polite">スケールを接続してください。</p><p id="scale-tare" class="scale-meta">受信したWgを正味重量として使用します。</p>
+          <p class="scale-help">先にSerial USB Terminalの接続を解除し、このページの「スケールを接続」からFTDI機器を選んでください。空ケースを風袋引きしてから中身を入れ、表示が安定するまで待ちます。</p>
+          <details><summary>受信の仕組み・診断情報</summary><p id="scale-support"></p><p>TL-280は安定した計量結果を送ります。重量が連続して動く表示ではありません。受信から30秒経過、画面を離れたとき、印刷開始時、USB切断時は重量を解除します。次のケースは「次の計量を開始」を押して載せ替え・再計量してください。物を下ろしたことは自動検出できません。</p><p>風袋量Ptは確認用です。Wgから二重に差し引きません。端末がUSBをChromeへ渡せない場合は直接受信できないため、下の情報を共有してください。</p><pre id="scale-diagnostics">まだ受信していません。</pre></details>
+        </section>
+        <section id="connection-card" class="card connection-card" aria-labelledby="printer-heading" data-state="unverified"><div class="connection-top"><div><span class="eyebrow">PRINTER</span><h2 id="printer-heading">プリンターとの接続</h2><p id="connection-title" aria-live="polite" role="status">接続は未確認です</p></div><button id="check-button" type="button" class="secondary">接続確認</button></div><p id="connection-detail">同じAndroid端末のSmooth Printと通信します。</p><details><summary>初回の準備・接続できないとき</summary><ol><li>AndroidにSmooth Printをインストールし、QL-820NWBを設定します。</li><li>新しい <b>gelato-label-v2.lbx</b> をダウンロードし、Smooth Printへ共有します。旧テンプレートでは日時・重量を印字できません。</li><li>このページをAndroidのChromeで開き、接続確認を押します。</li><li>Chromeが端末内通信の許可を求めた場合は、内容を確認して許可します。</li></ol><p>応答がない場合は、Smooth Printを起動して設定を確認し、このページに戻って再度接続確認を行います。</p><a href="assets/labels/gelato-label-v2.lbx" download="gelato-label-v2.lbx">日時・重量対応ラベルをダウンロード ↧</a><p class="tech-note">接続先：localhost:8088 ／ 印刷内容：FLAVOR・STAFF・MANUFACTURED_AT・WEIGHT</p></details></section>
       </aside>
     </div>
     <section class="card cloud-card" aria-labelledby="cloud-title">
@@ -82,6 +80,6 @@
     <p id="storage-note" class="storage-note" hidden>端末内の保存ができません。履歴の保存先を確認してから印刷してください。</p>
     <footer><span>いもんね / GELATO WORKSHOP</span><span>スケール連携テスト版 v0.6.0</span></footer>
   </main>
-  <script defer src="app.bundle.js"></script>
+  <script defer src="app.bundle.js?v=20261028-layout"></script>
 </body>
 </html>
