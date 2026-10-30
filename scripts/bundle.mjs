@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
 const directory = new URL('../apps/label-print/public/', import.meta.url);
-const order = ['config.mjs','cloud-config.mjs','production.mjs','transport.mjs','connection.mjs','cloud.mjs','app.mjs'];
+const order = ['config.mjs','cloud-config.mjs','production.mjs','transport.mjs','connection.mjs','cloud.mjs','scale.mjs','app.mjs'];
 
 // These buildless modules use named declarations and single-line relative imports only.
 // Keep the authored modules for tests; emit one classic script for file:// previews.

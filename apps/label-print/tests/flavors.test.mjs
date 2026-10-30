@@ -11,7 +11,7 @@ test('all original flavors are present before JavaScript runs, without duplicate
   assert.deepEqual(values.map(match=>match[1]),FLAVORS);
   assert.deepEqual(values.map(match=>match[2]),FLAVORS);
   assert.equal(new Set(values.map(match=>match[1])).size,15);
-  assert.match(html, /<script defer src="app\.bundle\.js"><\/script>/);
+  assert.match(html, /<script defer src="app\.bundle\.js(?:\?v=[\w-]+)?"><\/script>/);
 });
 test('committed classic script matches every authored module', async () => {
   const actual = await readFile(new URL('../public/app.bundle.js',import.meta.url),'utf8');

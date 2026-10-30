@@ -4,7 +4,7 @@ import {assessWeight, formatManufacturedAt} from './production.mjs';
 export const ENDPOINT = 'http://localhost:8088';
 export const TEMPLATE = 'gelato-label-v2.lbx';
 
-export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt}) {
+export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
   if (typeof staff !== 'string' || !staff.trim()) throw new Error('担当者名を入力してください。');
   if (staff.trim().length > 40) throw new Error('担当者名は40文字以内で入力してください。');
@@ -13,8 +13,11 @@ export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIG
   const assessment = assessWeight(weightG, weightRule);
   if (!assessment.accepted) throw new Error(assessment.message);
   if (manufacturedAt !== undefined) formatManufacturedAt(manufacturedAt);
+  if (!['manual','scale-usb'].includes(weightSource)) throw new Error('重量の取得方法が不正です。');
+  if (weightSource==='scale-usb' && (!Number.isInteger(tareG) || tareG<0 || !Number.isFinite(Date.parse(weightReceivedAt)))) throw new Error('重量の受信情報がありません。再計量してください。');
   return {flavor, staff: staff.trim(), copies: n, weightG:assessment.weightG,
-    weightSource:'manual', weightRule:{...weightRule}, judgment:'pass',
+    weightSource, weightRule:{...weightRule}, judgment:'pass',
+    ...(weightSource==='scale-usb'?{tareG,weightReceivedAt}:{}),
     ...(manufacturedAt === undefined ? {} : {manufacturedAt})};
 }
 

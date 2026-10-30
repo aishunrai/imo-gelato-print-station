@@ -8,6 +8,7 @@ import * as production from '../public/production.mjs';
 import {WEIGHT_RULE} from '../public/config.mjs';
 import {CLOUD_CONFIG} from '../public/cloud-config.mjs';
 import * as cloud from '../public/cloud.mjs';
+import * as scale from '../public/scale.mjs';
 
 const source = await readFile(new URL('../public/app.mjs', import.meta.url), 'utf8');
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
@@ -15,7 +16,7 @@ const bundle = await readFile(new URL('../public/app.bundle.js', import.meta.url
 const success = '<response><result>SUCCESS</result></response>';
 
 // Minimal DOM/response fixtures: execute the actual app handlers, not copies of them.
-function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = null} = {}) {
+function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = null, initialPreferences = null, testRows = null, automatic = false} = {}) {
   const downloads = []; let exportedBlob;
   class Element {
     value = ''; textContent = ''; hidden = false; disabled = false;
@@ -51,6 +52,8 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   }
   const storage = new Map();
   if (initialRows) storage.set('imo-print-station-v1:history',JSON.stringify(initialRows));
+  if (initialPreferences) storage.set('imo-print-station-v1:preferences',JSON.stringify(initialPreferences));
+  if (testRows) storage.set('imo-scale-test-v1:history',JSON.stringify(testRows));
   const sessions = new Map();
   if (cloudSession) sessions.set(`imo-sheets-connection:${CLOUD_CONFIG.spreadsheetId}`,JSON.stringify({endpoint:'https://script.google.com/macros/s/test-deployment/exec',key:'a'.repeat(64)}));
   class ExportURL extends URL {
@@ -59,7 +62,7 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   }
   let nextRecordId = 0;
   const context = vm.createContext({
-    ...transport, ...connection, ...production, ...cloud, WEIGHT_RULE, CLOUD_CONFIG, document, navigator: {userAgent: 'Android'},
+    ...transport, ...connection, ...production, ...cloud, ...scale, WEIGHT_RULE, CLOUD_CONFIG, document, navigator: {userAgent: 'Android'},
     window: {addEventListener() {},sessionStorage:{getItem:k=>sessions.get(k),setItem:(k,v)=>sessions.set(k,v),removeItem:k=>sessions.delete(k)}}, localStorage: {setItem:(k,v)=>storage.set(k,v), getItem:k=>storage.get(k) || null,removeItem:k=>storage.delete(k)},
     DOMParser: FixtureDOMParser, crypto: {randomUUID: () => `test-record-${++nextRecordId}`}, fetch:fetchImpl,
     setTimeout:(fn,ms)=>ms===5000 ? 0 : setTimeout(fn,ms), setInterval:()=>0, clearTimeout, URL:ExportURL, URLSearchParams, Blob, Intl, Date, AbortController,
@@ -67,19 +70,90 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
     requestPrinter: (operation, label, options) => transport.requestPrinter(operation, label, {...options, fetchImpl}),
   });
   vm.runInContext(bundled ? bundle : source.replace(/^import .*;\r?\n/gm, ''), context);
+  if (!automatic) { get('weight-mode').value='manual'; get('weight-mode').listeners.change(); }
   return {
+    simulate: code => vm.runInContext(code,context),
     get,
     click: id => get(id).listeners.click(),
     print: () => get('label-form').listeners.submit({preventDefault(){}}),
     fill: () => { get('flavor').value='ピスタチオ'; get('staff').value='製造担当'; get('weight').value='2000'; },
     visibility: async state => { document.visibilityState=state; await documentListeners.visibilitychange(); },
     rows: () => JSON.parse(storage.get('imo-print-station-v1:history')),
+    stored: key => storage.get(key),
     input: id => get(id).listeners.input(),
     history: () => get('history-list').children,
     exportFile: async () => { get('export-button').listeners.click(); return {filename:downloads.at(-1).download, text:await exportedBlob.text()}; },
   };
 }
 function reply(raw = success) { return {ok:true, type:'cors', text:async()=>raw}; }
+
+test('production release retains existing history, preferences and Sheets settings without importing test rows', async()=>{
+  const row={id:'existing-production-record',flavor:'ミルク',staff:'従来担当',copies:1,weightG:2020,weightSource:'manual',
+    weightRule:{baseWeightG:2000,upperTolerancePercent:5},judgment:'pass',status:'success',attempts:1,
+    createdAt:'2026-10-28T01:00:00.000Z',manufacturedAt:'2026-10-28T01:00:00.000Z',lastAttemptAt:'2026-10-28T01:00:00.000Z',
+    sheets:{project:`google-sheets:${CLOUD_CONFIG.spreadsheetId}`,revision:2,syncedRevision:2}};
+  const separateRows=[{...row,id:'separate-test-record'}];
+  let requests=0;
+  const app=setup(async()=>{requests++;throw new Error('Synced history must not be reprinted or uploaded');},
+    {bundled:true,automatic:true,initialRows:[row],initialPreferences:{flavor:'ミルク',staff:'従来担当'},testRows:separateRows,cloudSession:true});
+  await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(app.rows().length,1);assert.equal(app.rows()[0].id,row.id);
+  assert.equal(app.get('flavor').value,'ミルク');assert.equal(app.get('staff').value,'従来担当');
+  assert.equal(app.get('weight').value,'');assert.equal(app.get('weight').readOnly,true);
+  assert.match(app.get('cloud-status').textContent,/接続設定済み/);
+  assert.equal(app.stored('imo-scale-test-v1:history'),JSON.stringify(separateRows));
+  assert.equal(requests,0);
+});
+
+test('an interrupted production print remains locked after the scale release until operator reconciliation',async()=>{
+  const pending={id:'interrupted-production-record',flavor:'ミルク',staff:'担当',copies:1,weightG:2000,weightSource:'manual',
+    weightRule:{baseWeightG:2000,upperTolerancePercent:5},judgment:'pass',status:'pending',attempts:1,
+    createdAt:'2026-10-28T01:00:00.000Z',manufacturedAt:'2026-10-28T01:00:00.000Z',lastAttemptAt:'2026-10-28T01:00:00.000Z'};
+  let requests=0;
+  const app=setup(async()=>{requests++;return reply();},{automatic:true,initialRows:[pending]});
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  await app.print();
+  assert.equal(app.rows()[0].status,'unknown');assert.equal(app.get('print-button').disabled,true);
+  assert.equal(app.get('scale-arm').disabled,true);assert.equal(app.get('reconcile').hidden,false);assert.equal(requests,0);
+  await app.click('confirm-printed');assert.equal(app.rows()[0].status,'confirmed');assert.equal(requests,0);
+});
+
+test('USB sample automatically fills net weight, freezes scale provenance in label and Sheets log, and requires next case',async()=>{
+  const requests=[],logs=[];
+  const app=setup(async(url,options)=>{
+    if(String(url).startsWith('http://localhost')){requests.push(new URL(url));return reply();}
+    const body=JSON.parse(options.body);logs.push(body.record);return {ok:true,json:async()=>({ok:true,protocol:body.protocol,requestId:body.requestId,spreadsheetId:body.spreadsheetId,id:body.record.id,revision:body.record.client_revision})};
+  },{automatic:true,cloudSession:true});
+  app.get('flavor').value='ミルク';app.get('staff').value='担当者';
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  assert.equal(app.get('weight').value,'2050');assert.equal(app.get('weight').readOnly,true);
+  await app.print();await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味 2050 g');
+  assert.equal(app.rows()[0].weightSource,'scale-usb');assert.equal(app.rows()[0].tareG,334);
+  assert.equal(logs[0].weight_g,2050);assert.equal(logs[0].weight_source,'scale-usb');
+  assert.equal(app.get('weight').value,'');assert.equal(app.get('print-button').disabled,true);
+  assert.equal(app.get('preview-weight').textContent,'2050 g');
+  app.simulate('scaleSession.accept({weightG:2100,tareG:334});renderScale();');
+  await app.print();assert.equal(requests.length,1);
+  app.click('scale-arm');app.simulate('scaleSession.accept({weightG:2000,tareG:334});renderScale({preview:true});');
+  await app.print();assert.equal(requests.length,2);
+});
+test('direct submit cannot bypass stale/disconnected/tampered USB capture; switching mode clears weight',async()=>{
+  let prints=0;const app=setup(async()=>{prints++;return reply();},{automatic:true});
+  app.fill();await app.print();assert.equal(prints,0);
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  app.get('weight').value='2100';await app.print();assert.equal(prints,0);
+  app.simulate('scaleSession.disconnect();renderScale();');await app.print();assert.equal(prints,0);assert.equal(app.get('weight').value,'');
+  app.get('weight-mode').value='manual';app.get('weight-mode').listeners.change();assert.equal(app.get('weight').readOnly,false);
+  app.get('weight').value='2050';await app.print();assert.equal(prints,1);assert.equal(app.rows()[0].weightSource,'manual');
+});
+test('screen hiding invalidates captured weight and demo cannot consume real USB readings',async()=>{
+  const app=setup(async()=>reply(),{automatic:true});
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  await app.visibility('hidden');assert.equal(app.get('weight').value,'');assert.equal(app.get('print-button').disabled,true);
+  await app.click('demo-toggle');app.fill();await app.print();assert.deepEqual(app.rows(),[]);
+  await app.click('demo-toggle');assert.equal(app.get('weight').value,'');
+});
 
 test('classic browser bundle runs the actual weight/print flow without ES module loading', async () => {
   const requests = [];
@@ -102,7 +176,7 @@ test('actual print handler fixes a stale failed connection display and sends exa
   assert.equal(app.get('connection-title').textContent, '状態を確認できません');
   app.fill(); await app.print();
   assert.equal(app.get('connection-title').textContent, '印刷応答を確認しました');
-  assert.equal(app.get('printer-chip').dataset.state, 'confirmed');
+  assert.equal(app.get('connection-card').dataset.state, 'confirmed');
   assert.equal(app.rows()[0].status, 'success');
   assert.deepEqual(requests, ['/getstatus','/print']);
 });
@@ -115,9 +189,9 @@ test('returning from Smooth Print checks only status and does not lose prior pri
   });
   app.fill(); await app.print();
   await app.visibility('hidden');
-  assert.equal(app.get('printer-chip').dataset.state, 'unverified');
+  assert.equal(app.get('connection-card').dataset.state, 'unverified');
   await app.visibility('visible');
-  assert.equal(app.get('printer-chip').dataset.state, 'unknown');
+  assert.equal(app.get('connection-card').dataset.state, 'unknown');
   assert.match(app.get('connection-detail').textContent, /前回の応答確認/);
   assert.equal(app.rows()[0].status, 'success');
   assert.deepEqual(requests, ['/print','/getstatus']);
@@ -133,7 +207,7 @@ test('demo does not contact the printer or overwrite actual connection evidence'
   assert.equal(count, 1);
   assert.equal(app.get('connection-card').dataset.state, 'demo');
   await app.click('demo-toggle');
-  assert.equal(app.get('printer-chip').dataset.state, 'unverified');
+  assert.equal(app.get('connection-card').dataset.state, 'unverified');
   assert.deepEqual(app.rows(), []);
 });
 test('printer errors update the card while leaving uncertain print locked against duplicate submission', async () => {

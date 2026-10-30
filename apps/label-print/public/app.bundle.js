@@ -51,7 +51,7 @@ const FLAVORS = ['ピスタチオ','チョコ','白桃','伊勢抹茶','ほう�
 const ENDPOINT = 'http://localhost:8088';
 const TEMPLATE = 'gelato-label-v2.lbx';
 
-function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt}) {
+function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
   if (typeof staff !== 'string' || !staff.trim()) throw new Error('担当者名を入力してください。');
   if (staff.trim().length > 40) throw new Error('担当者名は40文字以内で入力してください。');
@@ -60,8 +60,11 @@ function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE
   const assessment = assessWeight(weightG, weightRule);
   if (!assessment.accepted) throw new Error(assessment.message);
   if (manufacturedAt !== undefined) formatManufacturedAt(manufacturedAt);
+  if (!['manual','scale-usb'].includes(weightSource)) throw new Error('重量の取得方法が不正です。');
+  if (weightSource==='scale-usb' && (!Number.isInteger(tareG) || tareG<0 || !Number.isFinite(Date.parse(weightReceivedAt)))) throw new Error('重量の受信情報がありません。再計量してください。');
   return {flavor, staff: staff.trim(), copies: n, weightG:assessment.weightG,
-    weightSource:'manual', weightRule:{...weightRule}, judgment:'pass',
+    weightSource, weightRule:{...weightRule}, judgment:'pass',
+    ...(weightSource==='scale-usb'?{tareG,weightReceivedAt}:{}),
     ...(manufacturedAt === undefined ? {} : {manufacturedAt})};
 }
 
@@ -268,22 +271,214 @@ function createLogSync({client,rows,persist,onChange = () => {},canRun = () => t
   };
 }
 
+// scale.mjs
+// TL-280 (8 kg), FTDI 0403:6001. No serial commands are written to the scale.
+const SCALE_USB_FILTER = Object.freeze({vendorId:0x0403, productId:0x6001});
+const SCALE_MAX_AGE_MS = 30000;
+
+function parseScaleLine(line) {
+  const clean = line.replace(/^\0+/, '').trim();
+  const fields = clean.split(',').map(value => value.trim());
+  if (fields.length !== 10 || fields[0] !== '{0' || fields[1] !== '16' || fields[2] !== '~0' || fields[3] !== '1'
+    || fields[4] !== 'MO' || fields[5] !== '"TL-280"' || fields[6] !== 'Wg' || fields[8] !== 'Pt'
+    || !/^\d{1,6}$/.test(fields[7]) || !/^\d{1,6}$/.test(fields[9])) throw new Error('TL-280の重量データを確認できません。載せ直して再計量してください。');
+  const weightG = Number(fields[7]), tareG = Number(fields[9]);
+  if (weightG + tareG > 8000 || tareG > 4000) throw new Error('8kg仕様の計量範囲を超えるデータです。');
+  return {weightG, tareG, raw:clean}; // Wg is already net; never subtract Pt again.
+}
+
+function createScaleFramer(onReading, onInvalid) {
+  let pending = '', dropping = false;
+  return {
+    reset() { pending = ''; dropping = false; },
+    push(bytes) {
+      for (const byte of bytes) {
+        if (byte === 10) {
+          if (!dropping && pending.trim()) {
+            try { onReading(parseScaleLine(pending)); }
+            catch (error) { onInvalid(error.message); }
+          }
+          pending = ''; dropping = false;
+        } else if (!dropping) {
+          if ((byte < 32 && byte !== 0 && byte !== 13) || byte > 126 || pending.length >= 512) {
+            pending = ''; dropping = true; onInvalid('受信データが不正です。再計量してください。');
+          } else pending += String.fromCharCode(byte);
+        }
+      }
+    },
+  };
+}
+
+function ftdiPayload(view, packetSize) {
+  if (!Number.isInteger(packetSize) || packetSize < 3) throw new Error('USBパケットサイズが不正です。');
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength), payload = [];
+  for (let offset = 0; offset < bytes.length; offset += packetSize) {
+    const end = Math.min(offset + packetSize, bytes.length);
+    if (end - offset < 2 || (bytes[offset+1] & 0x1e)) throw new Error('USBシリアルの受信エラーです。再接続してください。');
+    // Every USB packet, not just every transfer, starts with two FTDI status bytes.
+    for (let i = offset+2; i < end; i++) payload.push(bytes[i]);
+  }
+  return new Uint8Array(payload);
+}
+
+function createScaleSession({now = () => Date.now()} = {}) {
+  let connected = false, armed = false, reading = null, reason = 'スケールを接続してください。';
+  return {
+    get connected() { return connected; },
+    get armed() { return armed; },
+    get reading() { return reading; },
+    get reason() { return reason; },
+    connect() { connected = true; armed = true; reading = null; reason = '接続済みです。空ケースを風袋引きして計量してください。'; },
+    disconnect(message = 'スケールが切断されました。再接続してください。') { connected = false; armed = false; reading = null; reason = message; },
+    invalidate(message = '重量を再取得してください。') { reading = null; reason = message; },
+    pause(message) { armed = false; reading = null; reason = connected ? message : 'スケールを接続してください。'; },
+    arm() {
+      reading = null; armed = connected;
+      reason = connected ? 'ケースを載せ替えて、風袋引き後に計量してください。' : 'スケールを接続してください。';
+    },
+    accept(value) {
+      if (!connected || !armed) return false;
+      reading = {...value, receivedAt:new Date(now()).toISOString(), receivedMs:now()};
+      reason = 'スケールから重量を取得しました。'; return true;
+    },
+    snapshot() {
+      const age = reading ? now() - reading.receivedMs : Infinity;
+      if (!connected || !armed || !reading || age < 0 || age >= SCALE_MAX_AGE_MS) throw new Error('有効な重量がありません。「次の計量を開始」から再計量してください。');
+      return {weightG:reading.weightG, tareG:reading.tareG, weightReceivedAt:reading.receivedAt, weightSource:'scale-usb'};
+    },
+    expire() {
+      if (reading && (now() - reading.receivedMs >= SCALE_MAX_AGE_MS || now() < reading.receivedMs)) {
+        reading = null; armed = false; reason = '受信から30秒経過しました。「次の計量を開始」から再計量してください。'; return true;
+      }
+      return false;
+    },
+  };
+}
+
+function createFtdiScale({usb, onReading, onInvalid, onStatus, onDisconnect}) {
+  let device = null, interfaceNumber = null, generation = 0, opening = false;
+  const framer = createScaleFramer(onReading, onInvalid);
+  async function closeDevice(target, number) {
+    if (!target) return;
+    // Closing also cancels a pending transferIn. Do not await the read loop first.
+    try { if (target.opened) await target.close(); } catch {}
+  }
+  async function disconnect(message = 'スケールを切断しました。') {
+    generation++; framer.reset();
+    const previous = device, previousInterface = interfaceNumber;
+    device = null; interfaceNumber = null;
+    onDisconnect(message); await closeDevice(previous, previousInterface);
+  }
+  usb?.addEventListener('disconnect', event => {
+    if (event.device === device) void disconnect('USB接続が外れました。再接続してください。');
+  });
+  return {
+    get supported() { return !!usb?.requestDevice; },
+    disconnect,
+    resetFrame() { framer.reset(); },
+    async connect() {
+      if (!usb?.requestDevice) throw new Error('このブラウザではUSB接続を利用できません。AndroidのChromeでこのページを開いてください。');
+      if (opening || device) return;
+      opening = true; const ticket = ++generation;
+      let selected, selectedInterface;
+      try {
+        selected = await usb.requestDevice({filters:[{...SCALE_USB_FILTER}]});
+        if (ticket !== generation) return;
+        if (selected.vendorId !== SCALE_USB_FILTER.vendorId || selected.productId !== SCALE_USB_FILTER.productId) throw new Error('対象のFTDIケーブルではありません。');
+        await selected.open();
+        if (!selected.configuration) await selected.selectConfiguration(1);
+        const interfaces = selected.configuration.interfaces;
+        if (interfaces.length !== 1) throw new Error('このページは1ポートのFTDIケーブル専用です。');
+        const iface = interfaces[0];
+        const alternate = iface.alternates.find(alt => alt.interfaceClass === 255 && alt.endpoints.some(ep => ep.type === 'bulk' && ep.direction === 'in'));
+        if (!alternate) throw new Error('FTDIの受信ポートを確認できません。');
+        selectedInterface = iface.interfaceNumber;
+        await selected.claimInterface(selectedInterface);
+        if (iface.alternate.alternateSetting !== alternate.alternateSetting) await selected.selectAlternateInterface(selectedInterface, alternate.alternateSetting);
+        const input = alternate.endpoints.find(ep => ep.type === 'bulk' && ep.direction === 'in');
+        if (input.packetSize !== 64) throw new Error('このページで対応していないFTDIパケットサイズです。');
+        const control = async (request, value, index = selectedInterface+1) => {
+          const result = await selected.controlTransferOut({requestType:'vendor',recipient:'device',request,value,index});
+          if (result.status !== 'ok') throw new Error('USBの通信設定に失敗しました。');
+        };
+        await control(0,0); // FTDI reset (volatile UART state only)
+        await control(1,0x0300); // DTR/RTS disabled
+        await control(2,0); // no flow control
+        await control(3,0x4138,0); // 3MHz / 312.5 = 9600 baud, FT232R
+        await control(4,8); // 8 data bits, no parity, 1 stop bit
+        await control(0,1); // purge stale RX bytes before accepting a measurement
+        if (ticket !== generation) { await closeDevice(selected,selectedInterface); return; }
+        device = selected; interfaceNumber = selectedInterface; framer.reset();
+        onStatus('connected');
+        void (async () => {
+          try {
+            while (ticket === generation && device === selected) {
+              const result = await selected.transferIn(input.endpointNumber,input.packetSize*16);
+              if (ticket !== generation || device !== selected) break;
+              if (result.status !== 'ok' || !result.data) throw new Error('USBの重量データを受信できません。');
+              framer.push(ftdiPayload(result.data,input.packetSize));
+            }
+          } catch (error) {
+            if (ticket === generation) await disconnect(`受信を停止しました。${error.message}`);
+          }
+        })();
+      } catch (error) {
+        await closeDevice(selected,selectedInterface);
+        if (ticket === generation) {
+          onDisconnect(error.name === 'NotFoundError' ? '機器の選択をキャンセルしました。' : '接続できません。Terminalの接続を解除して再試行してください。');
+          const detail = error.name === 'NotFoundError' ? '機器の選択をキャンセルしました。' : `接続できません。Terminalを切断し、ChromeへのUSBアクセスを許可してください。解消しない場合は「診断情報」を確認してください。（${error.name || 'Error'}: ${error.message}）`;
+          throw new Error(detail);
+        }
+      } finally { opening = false; }
+    },
+  };
+}
+
 // app.mjs
 const $ = id => document.getElementById(id);
 const android = /Android/i.test(navigator.userAgent);
+// Preserve the established production history and preferences when promoting the scale page.
 const prefix = 'imo-print-station-v1';
 let demo = false, busy = false, checking = false, storageOK = true;
 let records = [], demoRecords = [];
 let connection = initialConnection();
 let cloudClient = null, cloudSync = null, cloudAuthBusy = false;
 const text = (id, value) => { $(id).textContent = value; };
+const scaleSession = createScaleSession();
+let scaleMode = 'usb', scaleConnecting = false, scaleDiagnostic = 'まだ受信していません。';
+const scaleDevice = createFtdiScale({usb:navigator.usb,
+  onReading:value=>{
+    scaleDiagnostic = `${new Date().toLocaleTimeString('ja-JP')} ${value.raw}`;
+    const accepted = !busy && !demo && scaleMode==='usb' && scaleSession.accept(value);
+    renderScale({preview:!!accepted});
+  },
+  onInvalid:message=>{scaleDiagnostic=message;scaleSession.invalidate(message);renderScale({preview:true});},
+  onStatus:()=>{scaleSession.connect();if(demo||scaleMode!=='usb')scaleSession.pause('USBで自動取得を選んでください。');renderScale();},
+  onDisconnect:message=>{scaleSession.disconnect(message);renderScale();},
+});
+
+function usingScale() { return !demo && scaleMode==='usb'; }
+function usableScaleWeight() { try { scaleSession.snapshot(); return true; } catch { return false; } }
+function renderScale({preview = false} = {}) {
+  text('scale-diagnostics',scaleDiagnostic);
+  $('scale-card').dataset.state=scaleSession.connected ? 'connected' : 'disconnected';
+  text('scale-title',scaleConnecting ? 'スケールに接続しています…' : demo ? '画面確認モード' : scaleSession.connected ? 'スケール接続済み' : 'スケール未接続');
+  text('scale-message',demo ? 'USBの受信値は使用せず、重量を手入力して画面を確認できます。' : scaleMode==='manual' ? '手入力で発行します。スケールの受信値は採用しません。' : scaleSession.reason);
+  text('scale-tare',scaleSession.reading ? `風袋 ${scaleSession.reading.tareG} g ／ ${new Date(scaleSession.reading.receivedAt).toLocaleTimeString('ja-JP')} 受信` : '受信したWgを正味重量として使用します。');
+  if (busy) { updateControls(); return; }
+  if (usingScale() && !busy) $('weight').value=usableScaleWeight() ? String(scaleSession.reading.weightG) : '';
+  $('weight').readOnly=usingScale();
+  $('weight').placeholder=usingScale()?'スケールから取得':'例：2000';
+  text('weight-source-label',demo ? '画面確認・手入力' : scaleMode==='usb' ? '必須・スケール自動取得' : '必須・手入力');
+  text('weight-help',usingScale() ? '空ケースを風袋引きしてから計量してください。表示が安定すると自動反映します。' : 'ケースの重量を除いた、ジェラートの重量を入力してください。');
+  if (preview) updatePreview(); else renderWeight();
+}
 
 function renderConnection() {
   const view = connectionView(connection, {android, demo});
   text('connection-title', view.title);
   text('connection-detail', view.detail);
   $('connection-card').dataset.state = view.kind;
-  $('printer-chip').dataset.state = view.kind;
 }
 function setConnection(event, details) {
   connection = connectionEvent(connection, event, details);
@@ -316,21 +511,31 @@ document.querySelector('.result-icon').id = 'result-icon';
 
 function updateControls() {
   const unresolved = activeUncertain(currentRows());
-  $('print-button').disabled = busy || checking || !!unresolved || !assessWeight($('weight').value).accepted || (!demo && (!android || !storageOK));
+  $('print-button').disabled = busy || checking || scaleConnecting || !!unresolved || !assessWeight($('weight').value).accepted || (usingScale() && !usableScaleWeight()) || (!demo && (!android || !storageOK));
   $('check-button').disabled = busy || checking;
   $('demo-toggle').disabled = busy || checking || !!activeUncertain(records);
   $('export-button').disabled = busy || currentRows().length === 0;
   for (const id of ['flavor','staff','copies','weight']) $(id).disabled = busy;
+  for (const id of ['scale-connect','scale-disconnect','scale-arm','weight-mode']) $(id).disabled=busy||checking||scaleConnecting||demo;
+  $('scale-connect').disabled ||= scaleSession.connected || !scaleDevice.supported;
+  $('scale-disconnect').disabled ||= !scaleSession.connected;
+  $('scale-arm').disabled ||= !scaleSession.connected || scaleMode!=='usb' || !!unresolved;
+  $('weight-mode').disabled ||= !!unresolved;
+  text('scale-support',scaleDevice.supported ? 'FTDI 0403:6001 ／ 9600bps・8N1 ／ ChromeへのUSB許可が必要です。' : 'このブラウザではUSB接続を利用できません。AndroidのChromeで開いてください。PCでは「画面を試す」を利用できます。');
   $('reconcile').hidden = !unresolved || busy;
   text('print-button-text', busy ? '印刷中…' : demo ? '画面で発行を試す' : 'ラベルを印刷');
   text('button-note', demo ? '画面確認のみ。実際のラベルは出ません。' : '印刷結果は、この画面に表示されます。');
   document.querySelectorAll('.retry-button').forEach(b => { b.disabled = busy || checking || !!unresolved || (!demo && (!android || !storageOK)); });
 }
-function snapshot() { return {flavor: $('flavor').value, staff: $('staff').value, copies: $('copies').value, weightG:$('weight').value}; }
+function snapshot() {
+  const measured = usingScale() ? scaleSession.snapshot() : {weightG:$('weight').value, weightSource:'manual'};
+  if (usingScale() && String(measured.weightG)!==$('weight').value) throw new Error('表示重量が受信値と一致しません。再計量してください。');
+  return {flavor: $('flavor').value, staff: $('staff').value, copies: $('copies').value, ...measured};
+}
 function renderWeight() {
   const judgment = assessWeight($('weight').value);
   $('weight-judgment').dataset.state = judgment.status;
-  text('weight-judgment', judgment.message);
+  text('weight-judgment', usingScale() && judgment.status==='empty' ? 'スケールから重量を取得してください。' : judgment.message);
   updateControls();
 }
 function updatePreview() {
@@ -356,7 +561,7 @@ function renderHistory() {
     const item = document.createElement('div'); item.className = 'history-item';
     const info = document.createElement('div');
     const title = document.createElement('strong'); title.textContent = row.flavor;
-    const detail = document.createElement('small'); detail.textContent = `${row.manufacturedAt ? formatManufacturedAt(row.manufacturedAt) : formatTime(row.createdAt)} / ${row.staff} / ${row.weightG == null ? '重量未記録（旧形式）' : `${row.weightG}g・手入力`} / ${row.copies}枚${row.attempts > 1 ? ` / 発行操作${row.attempts}回` : ''}${demo ? ' / 画面確認' : ''}`;
+    const detail = document.createElement('small'); detail.textContent = `${row.manufacturedAt ? formatManufacturedAt(row.manufacturedAt) : formatTime(row.createdAt)} / ${row.staff} / ${row.weightG == null ? '重量未記録（旧形式）' : `${row.weightG}g・${row.weightSource==='scale-usb'?'スケール':'手入力'}`} / ${row.copies}枚${row.attempts > 1 ? ` / 発行操作${row.attempts}回` : ''}${demo ? ' / 画面確認' : ''}`;
     info.append(title, detail);
     const actions = document.createElement('div'); actions.className = 'history-actions';
     const state = document.createElement('span'); state.className = `history-state ${row.status}`; state.textContent = statusNames[row.status]; actions.append(state);
@@ -379,6 +584,7 @@ async function print(existing = null) {
   try { label = validateLabel(existing || snapshot()); }
   catch (e) { result('入力内容を確認してください', e.message, 'error'); return; }
   busy = true;
+  if (!existing && usingScale()) scaleSession.pause('この重量は発行に使用しました。ケースを載せ替え、「次の計量を開始」を押してください。');
   const now = new Date().toISOString();
   const row = existing || {id: crypto.randomUUID(), ...label, createdAt: now, manufacturedAt:now, attempts: 0};
   // Freeze the timestamp, weight and rule before saving or sending; retries use this same record.
@@ -388,7 +594,7 @@ async function print(existing = null) {
   if (!demo) markLogChanged(row, cloudProject());
   if (!demo && !persist()) {
     row.status = 'failed'; row.detail = '履歴の保存に失敗したため、プリンタには送信していません。';
-    busy = false; result('保存できなかったため印刷を停止しました', row.detail, 'error'); renderHistory(); return;
+    busy = false; result('保存できなかったため印刷を停止しました', row.detail, 'error'); renderScale(); renderHistory(); return;
   }
   if (!demo) setConnection('printing');
   text('preview-flavor', row.flavor);
@@ -406,13 +612,14 @@ async function print(existing = null) {
     $('weight').value = '';
     renderWeight();
     text('preview-caption', '直前に発行した内容です。次の入力で更新します。');
-    result(demo ? '画面確認が完了しました' : 'ラベルの印刷が完了しました', `${row.detail} 次のケースの重量を入力してください。`, demo ? 'demo' : 'success');
+    result(demo ? '画面確認が完了しました' : 'ラベルの印刷が完了しました', `${row.detail} ${usingScale()?'次のケースは「次の計量を開始」から計量してください。':'次のケースの重量を入力してください。'}`, demo ? 'demo' : 'success');
   } catch (e) {
     if (!demo) setConnection('print-failure', {detail: e.message, code: e.code});
     row.status = 'unknown'; row.detail = `${e.message}${e.code ? ` (${e.code})` : ''}`;
     result('印刷結果を確認してください', `${row.detail} 自動では再送しません。`, 'unknown');
   } finally {
     busy = false;
+    if (!demo && scaleMode==='usb') renderScale();
     if (!demo) markLogChanged(row, cloudProject());
     if (!demo && !persist()) result('履歴を更新できませんでした', 'ラベルが出たか確認してください。履歴のCSVを保存し、保存先を確認してください。', 'unknown');
     renderHistory();
@@ -437,11 +644,13 @@ $('check-button').addEventListener('click', checkConnection);
 $('demo-toggle').addEventListener('click', () => {
   if (busy || checking || activeUncertain(records)) return;
   demo = !demo; $('demo-note').hidden = !demo; $('demo-toggle').setAttribute('aria-pressed', String(demo));
+  scaleSession.pause('「次の計量を開始」から再計量してください。'); $('weight').value='';
   text('demo-toggle', demo ? '実機印刷に戻る' : '画面を試す');
   text('history-title', demo ? '画面確認モードの発行履歴' : 'この端末の発行履歴');
   renderConnection();
   result(demo ? '画面確認モード' : '印刷の準備', demo ? 'フレーバーと担当者を入力して、発行の流れを試せます。' : '実機印刷はAndroidで行います。最初に接続確認をしてください。', demo ? 'demo' : '');
   renderHistory();
+  renderScale();
   scheduleCloudSync();
 });
 function reconcile(status) {
@@ -457,7 +666,7 @@ $('confirm-printed').addEventListener('click', () => reconcile('confirmed'));
 $('confirm-not-printed').addEventListener('click', () => reconcile('failed'));
 $('export-button').addEventListener('click', () => {
   const cell = value => { let s = String(value ?? ''); if (/^\s*[=+@-]/.test(s)) s = `'${s}`; return `"${s.replaceAll('"','""')}"`; };
-  const rows = [['記録ID','登録日時UTC','製造日時_日本時間','製造日時UTC','フレーバー','担当者','正味重量g','重量取得方法','基準重量g','許容上限率％','判定','ラベル枚数','状態','発行操作回数','最終発行操作日時UTC','詳細'], ...currentRows().map(r => [r.id,r.createdAt,r.manufacturedAt ? formatManufacturedAt(r.manufacturedAt) : '',r.manufacturedAt,r.flavor,r.staff,r.weightG,r.weightSource,r.weightRule?.baseWeightG,r.weightRule?.upperTolerancePercent,r.judgment,r.copies,statusNames[r.status],r.attempts,r.lastAttemptAt,r.detail])];
+  const rows = [['記録ID','登録日時UTC','製造日時_日本時間','製造日時UTC','フレーバー','担当者','正味重量g','重量取得方法','基準重量g','許容上限率％','判定','ラベル枚数','状態','発行操作回数','最終発行操作日時UTC','詳細','風袋量g','重量受信日時UTC'], ...currentRows().map(r => [r.id,r.createdAt,r.manufacturedAt ? formatManufacturedAt(r.manufacturedAt) : '',r.manufacturedAt,r.flavor,r.staff,r.weightG,r.weightSource,r.weightRule?.baseWeightG,r.weightRule?.upperTolerancePercent,r.judgment,r.copies,statusNames[r.status],r.attempts,r.lastAttemptAt,r.detail,r.tareG,r.weightReceivedAt])];
   const blob = new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${demo ? '画面確認' : 'ラベル発行履歴'}_${formatManufacturedAt(new Date().toISOString()).slice(0,10).replaceAll('/','-')}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
@@ -469,8 +678,8 @@ prepareSheetLogs(records,cloudProject());
 // A recovered interrupted print has a new outcome that must also reach the DB.
 for (const row of records) if (row.sheets && Array.isArray(storedHistory) && storedHistory.some(old => old?.id === row.id && old.status === 'pending')) markLogChanged(row, cloudProject());
 save('storage-check', true); persist();
-$('device-note').hidden = android;
 updatePreview(); renderHistory(); renderConnection();
+renderScale();
 const {minG, maxG} = weightLimits(WEIGHT_RULE);
 text('weight-range', `1ケース＝1B ／ ${minG}〜${maxG}g（基準${minG}g・＋${WEIGHT_RULE.upperTolerancePercent}％まで）`);
 if (activeUncertain(records)) result('前回の印刷結果を確認してください', activeUncertain(records).detail || '必要枚数のラベルが出たか確認してから、次の印刷に進んでください。', 'unknown');
@@ -478,6 +687,8 @@ initializeCloud();
 window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
+    scaleSession.pause('画面を離れたため重量を解除しました。「次の計量を開始」から再計量してください。');
+    if (!busy) renderScale();
     if (!busy && !checking) setConnection('stale');
   } else if (!busy && !checking && android && !demo) {
     // Returning from Smooth Print only reads status; it never re-sends a label.
@@ -485,6 +696,22 @@ document.addEventListener('visibilitychange', () => {
     return checkConnection();
   }
 });
+
+$('scale-connect').addEventListener('click',async()=>{
+  if(busy||checking||scaleConnecting||demo)return;
+  scaleConnecting=true;renderScale();
+  try { await scaleDevice.connect(); }
+  catch(error){scaleDiagnostic=error.message;scaleSession.disconnect(error.message);}
+  finally {scaleConnecting=false;renderScale();}
+});
+$('scale-disconnect').addEventListener('click',()=>{if(!busy&&!demo)return scaleDevice.disconnect();});
+$('scale-arm').addEventListener('click',()=>{if(busy||demo||activeUncertain(currentRows()))return;scaleDevice.resetFrame();scaleSession.arm();renderScale();});
+$('weight-mode').addEventListener('change',()=>{
+  if(busy||demo||activeUncertain(currentRows()))return;
+  scaleMode=$('weight-mode').value==='manual'?'manual':'usb';$('weight').value='';
+  scaleDevice.resetFrame();scaleSession.pause('「次の計量を開始」から計量してください。');renderScale({preview:true});
+});
+setInterval(()=>{if(scaleSession.expire()&&!busy)renderScale({preview:true});},500);
 
 function cloudProject() { return `google-sheets:${CLOUD_CONFIG.spreadsheetId}`; }
 function renderCloud() {

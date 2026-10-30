@@ -3,7 +3,7 @@ const root=new URL('../',import.meta.url), output=new URL('../dist-pages/',impor
 await mkdir(output,{recursive:true});
 await cp(new URL('apps/label-print/public/',root),output,{recursive:true});
 await cp(new URL('apps/scale-print/public/',root),new URL('scale-test/',output),{recursive:true});
-// Existing entry points and every asset must remain byte-for-byte identical.
+// Verify both published entry points against their own authored public directories.
 async function verify(source,target) {
   for(const entry of await readdir(source,{withFileTypes:true})) {
     const left=new URL(entry.name+(entry.isDirectory()?'/':''),source),right=new URL(entry.name+(entry.isDirectory()?'/':''),target);
@@ -12,4 +12,5 @@ async function verify(source,target) {
   }
 }
 await verify(new URL('apps/label-print/public/',root),output);
-console.log('Pages packaged: existing root unchanged; scale test at /scale-test/');
+await verify(new URL('apps/scale-print/public/',root),new URL('scale-test/',output));
+console.log('Pages packaged: production scale printing at /; separate scale test at /scale-test/');
