@@ -128,7 +128,7 @@ test('USB sample automatically fills net weight, freezes scale provenance in lab
   app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
   assert.equal(app.get('weight').value,'2050');assert.equal(app.get('weight').readOnly,true);
   await app.print();await new Promise(resolve=>setTimeout(resolve,30));
-  assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味 2050 g');
+  assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味：2050 g');
   assert.equal(app.rows()[0].weightSource,'scale-usb');assert.equal(app.rows()[0].tareG,334);
   assert.equal(logs[0].weight_g,2050);assert.equal(logs[0].weight_source,'scale-usb');
   assert.equal(app.get('weight').value,'');assert.equal(app.get('print-button').disabled,true);
@@ -161,7 +161,7 @@ test('classic browser bundle runs the actual weight/print flow without ES module
   app.fill(); app.get('weight').value='2050'; await app.print();
   assert.equal(requests.length,1);
   assert.equal(requests[0].searchParams.get('text_FLAVOR'),'ピスタチオ');
-  assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味 2050 g');
+  assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味：2050 g');
   assert.equal(app.rows()[0].status,'success');
 });
 
@@ -251,8 +251,8 @@ test('a single frozen timestamp and weight are used in print, history and previe
   assert.deepEqual(row.weightRule, {baseWeightG:2000,upperTolerancePercent:5});
   assert.equal(row.judgment, 'pass');
   assert.equal(row.manufacturedAt, row.createdAt);
-  assert.equal(printed.searchParams.get('text_MANUFACTURED_AT'), `製造 ${production.formatManufacturedAt(row.manufacturedAt)}`);
-  assert.equal(printed.searchParams.get('text_WEIGHT'), '正味 2050 g');
+  assert.equal(printed.searchParams.get('text_MANUFACTURED_AT'), production.formatManufacturedAt(row.manufacturedAt));
+  assert.equal(printed.searchParams.get('text_WEIGHT'), '正味：2050 g');
   assert.equal(app.get('preview-manufactured-at').textContent, production.formatManufacturedAt(row.manufacturedAt));
   assert.equal(app.get('weight').value, '');
   assert.equal(app.get('print-button').disabled, true);

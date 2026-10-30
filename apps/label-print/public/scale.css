@@ -40,6 +40,12 @@
 .connection-top #connection-title{font-size:12px;margin:7px 0 0;overflow-wrap:anywhere}
 .connection-top .secondary{flex-shrink:0;min-height:44px}
 .connection-card details{overflow-wrap:anywhere}
+.paper-label{min-height:0}
+.paper-label>strong{font-size:30px;font-weight:800;line-height:1.2;padding:0 0 12px}
+.label-date{font-size:14px;line-height:1.4;margin-bottom:5px;font-variant-numeric:tabular-nums}
+.paper-label .label-line,.paper-label .label-bottom{justify-content:flex-start;gap:0;font-size:14px;line-height:1.4}
+.paper-label .label-line{margin-bottom:5px}
+.paper-label .label-bottom{border-top:0;margin-top:0;padding-top:0}
 @media(max-width:900px){
   .workspace{gap:18px}
   #label-form{gap:20px}

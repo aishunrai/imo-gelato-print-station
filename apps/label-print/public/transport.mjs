@@ -2,7 +2,7 @@ export const FLAVORS = ['ピスタチオ','チョコ','白桃','伊勢抹茶','�
 import {WEIGHT_RULE} from './config.mjs';
 import {assessWeight, formatManufacturedAt} from './production.mjs';
 export const ENDPOINT = 'http://localhost:8088';
-export const TEMPLATE = 'gelato-label-v2.lbx';
+export const TEMPLATE = 'gelato-label-v3.lbx';
 
 export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
@@ -26,8 +26,10 @@ export function printUrl(label) {
   const url = new URL('/print', ENDPOINT);
   const manufactured = formatManufacturedAt(data.manufacturedAt);
   url.search = new URLSearchParams({filename: TEMPLATE, size: 'DieCutW62H29', copies: String(data.copies),
-    text_FLAVOR:data.flavor, text_STAFF:`担当 ${data.staff}`,
-    text_MANUFACTURED_AT:`製造 ${manufactured}`, text_WEIGHT:`正味 ${data.weightG} g`}).toString();
+    text_FLAVOR:data.flavor, text_STAFF:`担当：${data.staff}`,
+    text_MANUFACTURED_AT:manufactured, text_WEIGHT:`正味：${data.weightG} g`}).toString().replace(/\+/g, '%20');
+  // Smooth Print decodes percent escapes; form-style '+' would print literally.
+  // Replacing only raw '+' preserves a real plus sign encoded as %2B.
   return url.toString();
 }
 

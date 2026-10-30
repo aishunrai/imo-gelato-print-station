@@ -30,3 +30,27 @@ test('shipped Brother template has every object addressed by the print request',
   assert.doesNotMatch(xml, /text:datetime|atPrint="true"/);
   assert.match(xml, /width="175\.7pt" height="81\.8pt"/);
 });
+
+test('v3 keeps the original bold font and 18pt heading, with three readable 9pt rows inside the paper', async()=>{
+  const data=await readFile(new URL(`../public/assets/labels/${TEMPLATE}`,import.meta.url));
+  const xml=readZipEntry(data,'label.xml');
+  const original=readZipEntry(await readFile(new URL('../public/assets/labels/gelato-label.lbx',import.meta.url)),'label.xml');
+  const attributes=tag=>Object.fromEntries([...tag.matchAll(/([\w]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]));
+  assert.deepEqual(attributes(xml.match(/<style:paper\b[^>]+>/)[0]),attributes(original.match(/<style:paper\b[^>]+>/)[0]));
+  const blocks=[...xml.matchAll(/<text:text>([\s\S]*?)<\/text:text>/g)].map(m=>m[1]);
+  const flavor=blocks.find(block=>block.includes('objectName="FLAVOR"'));
+  assert.match(flavor,/name="美杉ゴシックB"/);assert.match(flavor,/size="18pt"/);
+  for(const font of flavor.matchAll(/<text:logFont\b[^>]+>/g))assert.equal(attributes(font[0]).name,'美杉ゴシックB');
+  for(const block of blocks){
+    const style=attributes(block.match(/<pt:objectStyle\b[^>]+>/)[0]);
+    const point=key=>Number.parseFloat(style[key]);
+    assert.ok(point('x')>=8.4 && point('x')+point('width')<=73.4);
+    assert.ok(point('y')>=4.3 && point('y')+point('height')<=171.4);
+    assert.equal(style.angle,'270');
+    assert.match(block,/shrink="true" autoLF="false"/);
+    if(block!==flavor)assert.match(block,/size="9pt"/);
+  }
+  assert.match(xml,/<pt:data>2026\/10\/30 15:16<\/pt:data>/);
+  assert.match(xml,/<pt:data>担当：桐脇<\/pt:data>/);
+  assert.match(xml,/<pt:data>正味：2090 g<\/pt:data>/);
+});

@@ -5,12 +5,23 @@ const label = {flavor:'ピスタチオ', staff:'試験 & + = 担当', copies:1, 
 test('keeps existing template, paper and exact Unicode field values', () => {
   const url = new URL(printUrl(label));
   assert.equal(url.origin, 'http://localhost:8088'); assert.equal(url.pathname, '/print');
-  assert.equal(url.searchParams.get('filename'), 'gelato-label-v2.lbx');
+  assert.equal(url.searchParams.get('filename'), 'gelato-label-v3.lbx');
   assert.equal(url.searchParams.get('size'), 'DieCutW62H29');
-  assert.equal(url.searchParams.get('text_STAFF'), `担当 ${label.staff}`);
+  assert.equal(url.searchParams.get('text_STAFF'), `担当：${label.staff}`);
   assert.equal(url.searchParams.get('text_FLAVOR'), label.flavor);
-  assert.equal(url.searchParams.get('text_MANUFACTURED_AT'), '製造 2026/10/15 14:35');
-  assert.equal(url.searchParams.get('text_WEIGHT'), '正味 2000 g');
+  assert.equal(url.searchParams.get('text_MANUFACTURED_AT'), '2026/10/15 14:35');
+  assert.equal(url.searchParams.get('text_WEIGHT'), '正味：2000 g');
+});
+
+test('Smooth Print percent-only decoding receives spaces and preserves literal plus, ampersand and equals',()=>{
+  const query=new URL(printUrl(label)).search.slice(1);
+  assert.ok(!query.includes('+'));
+  assert.match(query,/%20/);assert.match(query,/%2B/);
+  const values=Object.fromEntries(query.split('&').map(pair=>pair.split('=').map(decodeURIComponent)));
+  assert.equal(values.text_FLAVOR,label.flavor);
+  assert.equal(values.text_STAFF,`担当：${label.staff}`);
+  assert.equal(values.text_MANUFACTURED_AT,'2026/10/15 14:35');
+  assert.equal(values.text_WEIGHT,'正味：2000 g');
 });
 test('rejects blank, fractional and out-of-range counts before any print request', () => {
   for (const copies of ['', '1.5', 0, 51, '1abc']) assert.throws(() => validateLabel({...label,copies}));

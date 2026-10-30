@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#354a36">
   <meta name="description" content="スケールの重量を取得し、製造日時・担当者入りのジェラートラベルを印刷できます。">
   <title>いもんね ジェラートラベル印刷</title>
-  <link rel="stylesheet" href="styles.css?v=20261030-release">
-  <link rel="stylesheet" href="weight.css?v=20261030-release">
-  <link rel="stylesheet" href="cloud.css?v=20261030-release">
-  <link rel="stylesheet" href="scale.css?v=20261030-release">
+  <link rel="stylesheet" href="styles.css?v=20261030-label-v3">
+  <link rel="stylesheet" href="weight.css?v=20261030-label-v3">
+  <link rel="stylesheet" href="cloud.css?v=20261030-label-v3">
+  <link rel="stylesheet" href="scale.css?v=20261030-label-v3">
 </head>
 <body>
   <header class="topbar"><h1 class="site-title"><a class="brand" href="./">いもんね ジェラートラベル印刷</a></h1><span class="edition">スケール連携</span></header>
@@ -47,7 +47,7 @@
         <div id="reconcile" class="reconcile" hidden><p>ラベルの出力を確認して、次の操作を選んでください。途中まで出た場合は、不要なラベルを処理してから再発行します。</p><button id="confirm-printed" type="button" class="secondary">必要枚数の印刷を確認</button><button id="confirm-not-printed" type="button" class="text-button">未完了・再発行が必要</button></div>
       </section>
     <div class="workspace">
-        <section class="card preview-card" aria-labelledby="preview-title"><div class="card-heading"><h2 id="preview-title"><span class="step">02</span>ラベル内容</h2><span class="dimension">62 × 29 mm</span></div><div class="label-bed"><div class="paper-label"><span class="label-tiny">GELATO</span><strong id="preview-flavor">フレーバー</strong><div class="label-line"><span>製造</span><span id="preview-manufactured-at">発行時に自動取得</span></div><div class="label-line"><span>正味重量</span><span id="preview-weight">未入力</span></div><div class="label-bottom"><span>担当者</span><span id="preview-staff">未入力</span></div></div></div><p class="preview-note" id="preview-caption">入力内容の確認用です。製造日時は発行時に確定します。</p><div class="preview-meta"><span>印刷する枚数</span><strong><span id="preview-copies">1</span><small> 枚</small></strong></div></section>
+        <section class="card preview-card" aria-labelledby="preview-title"><div class="card-heading"><h2 id="preview-title"><span class="step">02</span>ラベル内容</h2><span class="dimension">62 × 29 mm</span></div><div class="label-bed"><div class="paper-label"><strong id="preview-flavor">フレーバー</strong><div class="label-date" id="preview-manufactured-at">発行時に自動取得</div><div class="label-line"><span>正味：</span><span id="preview-weight">未入力</span></div><div class="label-bottom"><span>担当：</span><span id="preview-staff">未入力</span></div></div></div><p class="preview-note" id="preview-caption">入力内容の確認用です。製造日時は発行時に確定します。</p><div class="preview-meta"><span>印刷する枚数</span><strong><span id="preview-copies">1</span><small> 枚</small></strong></div></section>
       <aside class="aside" aria-label="機器との接続">
         <section id="scale-card" class="card scale-card" aria-labelledby="scale-heading" data-state="disconnected">
           <div class="card-heading"><div><span class="eyebrow">TL-280 / USB</span><h2 id="scale-heading">スケールとの接続</h2></div><span class="scale-badge">正味重量 Wg</span></div>
@@ -56,7 +56,7 @@
           <p class="scale-help">先にSerial USB Terminalの接続を解除し、このページの「スケールを接続」からFTDI機器を選んでください。空ケースを風袋引きしてから中身を入れ、表示が安定するまで待ちます。</p>
           <details><summary>受信の仕組み・診断情報</summary><p id="scale-support"></p><p>TL-280は安定した計量結果を送ります。重量が連続して動く表示ではありません。受信から30秒経過、画面を離れたとき、印刷開始時、USB切断時は重量を解除します。次のケースは「次の計量を開始」を押して載せ替え・再計量してください。物を下ろしたことは自動検出できません。</p><p>風袋量Ptは確認用です。Wgから二重に差し引きません。端末がUSBをChromeへ渡せない場合は直接受信できないため、下の情報を共有してください。</p><pre id="scale-diagnostics">まだ受信していません。</pre></details>
         </section>
-        <section id="connection-card" class="card connection-card" aria-labelledby="printer-heading" data-state="unverified"><div class="connection-top"><div><span class="eyebrow">PRINTER</span><h2 id="printer-heading">プリンターとの接続</h2><p id="connection-title" aria-live="polite" role="status">接続は未確認です</p></div><button id="check-button" type="button" class="secondary">接続確認</button></div><p id="connection-detail">同じAndroid端末のSmooth Printと通信します。</p><details><summary>初回の準備・接続できないとき</summary><ol><li>AndroidにSmooth Printをインストールし、QL-820NWBを設定します。</li><li>新しい <b>gelato-label-v2.lbx</b> をダウンロードし、Smooth Printへ共有します。旧テンプレートでは日時・重量を印字できません。</li><li>このページをAndroidのChromeで開き、接続確認を押します。</li><li>Chromeが端末内通信の許可を求めた場合は、内容を確認して許可します。</li></ol><p>応答がない場合は、Smooth Printを起動して設定を確認し、このページに戻って再度接続確認を行います。</p><a href="assets/labels/gelato-label-v2.lbx" download="gelato-label-v2.lbx">日時・重量対応ラベルをダウンロード ↧</a><p class="tech-note">接続先：localhost:8088 ／ 印刷内容：FLAVOR・STAFF・MANUFACTURED_AT・WEIGHT</p></details></section>
+        <section id="connection-card" class="card connection-card" aria-labelledby="printer-heading" data-state="unverified"><div class="connection-top"><div><span class="eyebrow">PRINTER</span><h2 id="printer-heading">プリンターとの接続</h2><p id="connection-title" aria-live="polite" role="status">接続は未確認です</p></div><button id="check-button" type="button" class="secondary">接続確認</button></div><p id="connection-detail">同じAndroid端末のSmooth Printと通信します。</p><details><summary>初回の準備・接続できないとき</summary><ol><li>AndroidにSmooth Printをインストールし、QL-820NWBを設定します。</li><li>新しい <b>gelato-label-v3.lbx</b> をダウンロードし、Smooth Printへ共有します。v3は既存ラベルに合わせた太字・配置です。v2から切り替える場合も取り込みが必要です。</li><li>このページをAndroidのChromeで開き、接続確認を押します。</li><li>Chromeが端末内通信の許可を求めた場合は、内容を確認して許可します。</li></ol><p>応答がない場合は、Smooth Printを起動して設定を確認し、このページに戻って再度接続確認を行います。</p><a href="assets/labels/gelato-label-v3.lbx" download="gelato-label-v3.lbx">太字・日時・重量対応ラベルをダウンロード ↧</a><p class="tech-note">接続先：localhost:8088 ／ 印刷内容：FLAVOR・STAFF・MANUFACTURED_AT・WEIGHT</p></details></section>
       </aside>
     </div>
     <section class="card cloud-card" aria-labelledby="cloud-title">
@@ -77,8 +77,8 @@
     </section>
     <section class="card history-card" aria-labelledby="history-title"><div class="card-heading"><div><h2 id="history-title">この端末の発行履歴</h2><p>この端末の実機印刷を保存し、接続設定後はシートにも同期します。画面確認モードはシートに保存しません。</p></div><button id="export-button" class="text-button" type="button">CSVを保存 ↓</button></div><div id="history-list" class="history-list"><p class="empty">まだ発行履歴はありません。</p></div></section>
     <p id="storage-note" class="storage-note" hidden>端末内の保存ができません。履歴の保存先を確認してから印刷してください。</p>
-    <footer><span>いもんね / GELATO WORKSHOP</span><span>ラベル印刷 v0.7.0</span></footer>
+    <footer><span>いもんね / GELATO WORKSHOP</span><span>ラベル印刷 v0.7.1</span></footer>
   </main>
-  <script defer src="app.bundle.js?v=20261030-release"></script>
+  <script defer src="app.bundle.js?v=20261030-label-v3"></script>
 </body>
 </html>
