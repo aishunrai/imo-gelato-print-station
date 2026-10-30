@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css?v=20261030-label-v3">
   <link rel="stylesheet" href="weight.css?v=20261030-label-v3">
   <link rel="stylesheet" href="cloud.css?v=20261030-label-v3">
-  <link rel="stylesheet" href="scale.css?v=20261030-label-v3">
+  <link rel="stylesheet" href="scale.css?v=20261030-next-measure">
 </head>
 <body>
   <header class="topbar"><h1 class="site-title"><a class="brand" href="./">いもんね ジェラートラベル印刷</a></h1><span class="edition">スケール連携</span></header>
@@ -41,6 +41,7 @@
           <div class="weight-field"><label for="weight">正味重量<span id="weight-source-label">必須・スケール自動取得</span></label><div class="weight-input"><input id="weight" name="weight" type="number" min="1" step="1" inputmode="numeric" placeholder="スケールから取得" autocomplete="off" aria-describedby="weight-help weight-range weight-judgment" required readonly><span>g</span></div><p id="weight-help">空ケースを風袋引きしてから計量してください。</p><p id="weight-range"></p><p id="weight-judgment" class="weight-judgment" role="status" aria-live="polite" data-state="empty">正味重量を取得してください。</p></div>
           <div class="print-actions"><p class="retain-note">フレーバー・担当者は保持します。次のケースは「次の計量を開始」から計量してください。</p>
           <button id="print-button" class="primary" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 9V3h12v6M6 17H4V9h16v8h-2M6 14h12v7H6zM16 11h1"/></svg><span id="print-button-text">ラベルを印刷</span><span class="arrow" aria-hidden="true">↗</span></button>
+          <button id="scale-arm" class="secondary next-measure" type="button">次の計量を開始</button>
           <p class="button-note" id="button-note">印刷結果は、この画面に表示されます。</p></div>
         </form>
         <div id="result" class="result" role="status" aria-live="polite"><span class="result-icon" aria-hidden="true">○</span><div><strong id="result-title">印刷の準備</strong><p id="result-detail">最初に「接続確認」でプリンタの応答を確認してください。</p></div></div>
@@ -51,7 +52,7 @@
       <aside class="aside" aria-label="機器との接続">
         <section id="scale-card" class="card scale-card" aria-labelledby="scale-heading" data-state="disconnected">
           <div class="card-heading"><div><span class="eyebrow">TL-280 / USB</span><h2 id="scale-heading">スケールとの接続</h2></div><span class="scale-badge">正味重量 Wg</span></div>
-          <div class="scale-toolbar"><div class="scale-mode"><label for="weight-mode">重量の取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div><div class="scale-buttons"><button id="scale-connect" class="secondary" type="button">スケールを接続</button><button id="scale-arm" class="secondary" type="button">次の計量を開始</button><button id="scale-disconnect" class="text-button" type="button">切断</button></div></div>
+          <div class="scale-toolbar"><div class="scale-mode"><label for="weight-mode">重量の取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div><div class="scale-buttons"><button id="scale-connect" class="secondary" type="button">スケールを接続</button><button id="scale-disconnect" class="text-button" type="button">切断</button></div></div>
           <strong id="scale-title" role="status" aria-live="polite">スケール未接続</strong><p id="scale-message" role="status" aria-live="polite">スケールを接続してください。</p><p id="scale-tare" class="scale-meta">受信したWgを正味重量として使用します。</p>
           <p class="scale-help">先にSerial USB Terminalの接続を解除し、このページの「スケールを接続」からFTDI機器を選んでください。空ケースを風袋引きしてから中身を入れ、表示が安定するまで待ちます。</p>
           <details><summary>受信の仕組み・診断情報</summary><p id="scale-support"></p><p>TL-280は安定した計量結果を送ります。重量が連続して動く表示ではありません。受信から30秒経過、画面を離れたとき、印刷開始時、USB切断時は重量を解除します。次のケースは「次の計量を開始」を押して載せ替え・再計量してください。物を下ろしたことは自動検出できません。</p><p>風袋量Ptは確認用です。Wgから二重に差し引きません。端末がUSBをChromeへ渡せない場合は直接受信できないため、下の情報を共有してください。</p><pre id="scale-diagnostics">まだ受信していません。</pre></details>
