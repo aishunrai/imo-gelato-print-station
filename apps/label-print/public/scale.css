@@ -2,7 +2,9 @@
 .topbar{height:auto;min-height:88px;gap:20px;padding-top:20px;padding-bottom:20px}
 .site-title{margin:0;font:inherit;line-height:1.4}
 .brand{font-size:clamp(18px,2.1vw,23px);letter-spacing:.02em}
-.edition{flex-shrink:0}
+.topbar-scale{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-shrink:0}
+.topbar-scale .secondary{min-height:44px;white-space:nowrap}
+.header-scale-status{color:#426d46;font-size:13px;font-weight:600;white-space:nowrap}
 .trial-banner{padding:14px 18px;margin:0 0 24px;background:#edf1e9;border:1px solid #d7dfd1;border-radius:10px;font-size:13px;line-height:1.8}
 .trial-banner a{color:#354a36;display:inline-block;margin-left:12px;font-weight:600}
 .form-card{width:100%}
@@ -54,8 +56,8 @@
   .scale-badge{display:none}
 }
 @media(max-width:699px){
-  .topbar{align-items:flex-start;flex-direction:column;gap:8px}
-  .edition{max-width:none;text-align:left}
+  .topbar{align-items:stretch;flex-direction:column;gap:8px}
+  .topbar-scale{align-self:flex-end}
   .brand{font-size:18px}
   .trial-banner a{margin-left:0;display:block}
   #label-form{grid-template-columns:1fr}

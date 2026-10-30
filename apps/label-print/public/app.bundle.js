@@ -464,6 +464,7 @@ function usableScaleWeight() { try { scaleSession.snapshot(); return true; } cat
 function renderScale({preview = false} = {}) {
   text('scale-diagnostics',scaleDiagnostic);
   $('scale-card').dataset.state=scaleSession.connected ? 'connected' : 'disconnected';
+  $('header-scale-status').hidden = !scaleSession.connected;
   text('scale-title',scaleConnecting ? 'スケールに接続しています…' : demo ? '画面確認モード' : scaleSession.connected ? 'スケール接続済み' : 'スケール未接続');
   text('scale-message',demo ? 'USBの受信値は使用せず、重量を手入力して画面を確認できます。' : scaleMode==='manual' ? '手入力で発行します。スケールの受信値は採用しません。' : scaleSession.reason);
   text('scale-tare',scaleSession.reading ? `風袋 ${scaleSession.reading.tareG} g ／ ${new Date(scaleSession.reading.receivedAt).toLocaleTimeString('ja-JP')} 受信` : '受信したWgを正味重量として使用します。');
