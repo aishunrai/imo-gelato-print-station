@@ -1,12 +1,23 @@
-/* Layout overrides apply only to the separate scale printing page. */
-.topbar{height:auto;min-height:88px;gap:20px;padding-top:20px;padding-bottom:20px}
-.site-title{margin:0;font:inherit;line-height:1.4}
+/* Production scale and printer controls live together in the header. */
+.topbar{height:auto;min-height:88px;gap:20px;padding-top:20px;padding-bottom:20px;align-items:flex-start}
+.site-title{margin:0;font:inherit;line-height:1.4;align-self:center}
 .brand{font-size:clamp(18px,2.1vw,23px);letter-spacing:.02em}
-.topbar-scale{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-shrink:0}
-.topbar-scale .secondary{min-height:44px;white-space:nowrap}
-.header-scale-status{color:#426d46;font-size:13px;font-weight:600;white-space:nowrap}
-.trial-banner{padding:14px 18px;margin:0 0 24px;background:#edf1e9;border:1px solid #d7dfd1;border-radius:10px;font-size:13px;line-height:1.8}
-.trial-banner a{color:#354a36;display:inline-block;margin-left:12px;font-weight:600}
+.topbar-devices{display:grid;gap:7px;width:min(100%,400px);flex-shrink:0}
+.topbar-device{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:44px}
+.topbar-device>span{flex:1;text-align:right;font-size:12px;line-height:1.4;color:var(--muted)}
+.topbar-device .secondary{min-height:44px;min-width:166px;white-space:nowrap}
+.topbar-device .header-scale-status,#connection-card[data-state="confirmed"] #connection-title{color:#426d46;font-weight:600}
+#connection-card[data-state="unknown"] #connection-title,#connection-card[data-state="warning"] #connection-title{color:var(--red)}
+.device-details{text-align:right;font-size:12px}
+.device-details>summary{display:inline-block;color:var(--green);text-decoration:underline;text-underline-offset:4px}
+.device-details[open]{text-align:left;background:#fff;border:1px solid var(--border);border-radius:9px;padding:12px 16px}
+.device-detail-content{max-height:55vh;overflow:auto;overflow-wrap:anywhere}
+.device-detail-content section+section{border-top:1px solid var(--border);margin-top:14px;padding-top:12px}
+.device-detail-content p,.device-detail-content li{font-size:11px;line-height:1.6}
+.device-detail-content ol{padding-left:20px}
+.device-detail-content a{color:var(--green)}
+.device-detail-content pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f5ef;padding:10px;border-radius:6px;font-size:10px}
+.device-detail-content .text-button{margin:3px 0}
 .form-card{width:100%}
 #label-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 28px}
 #label-form>div{min-width:0}
@@ -16,33 +27,14 @@
 .print-actions .button-note{margin:10px 0 0}
 .print-actions .next-measure{width:100%;min-height:48px;margin-top:12px;font-size:14px}
 .form-card>.result{margin-top:22px}
-.workspace{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:24px}
-.workspace>*{min-width:0}
-.workspace .aside{gap:18px;min-width:0}
-.scale-card{padding:24px;margin:0;border-left:4px solid #80917e}
-.scale-card[data-state="connected"]{border-left-color:#426d46}
-.scale-card .card-heading{margin-bottom:18px}
-.scale-toolbar{display:grid;gap:12px;margin-bottom:20px}
-.scale-mode{min-width:0}
-.scale-mode label{display:block;margin:0 0 7px}
-.scale-mode select{margin:0}
-.scale-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.scale-buttons button{min-height:44px}
-.scale-buttons .secondary{flex:1}
-.scale-buttons .text-button{padding:8px 4px}
-.scale-badge{padding:7px 12px;background:#eff2eb;border-radius:20px;font-size:12px;white-space:nowrap}
-.scale-card strong{display:block;font-size:16px}
-.scale-card p{font-size:13px;line-height:1.8;margin:8px 0;overflow-wrap:anywhere}
-.scale-meta{color:#56664e}
-.scale-help{color:#586156}
-.scale-card details{border-top:1px solid #e3e7df;padding-top:12px;margin-top:14px}
-.scale-card pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f5ef;padding:12px;border-radius:6px;font-size:12px}
+.workspace{display:block;margin-top:24px}
+.preview-card{max-width:560px}
+.weight-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.weight-heading>label{margin-bottom:9px}
+.scale-mode{display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.scale-mode label{margin:0;white-space:nowrap;font-size:11px}
+.scale-mode select{width:auto;min-height:38px;margin:0;padding:4px 8px;font-size:12px}
 .weight-input input[readonly]{background:#f1f4ee;color:#243d26}
-.connection-top>div{min-width:0}
-.connection-top h2{font-size:15px;font-weight:600}
-.connection-top #connection-title{font-size:12px;margin:7px 0 0;overflow-wrap:anywhere}
-.connection-top .secondary{flex-shrink:0;min-height:44px}
-.connection-card details{overflow-wrap:anywhere}
 .paper-label{min-height:0}
 .paper-label>strong{font-size:30px;font-weight:800;line-height:1.2;padding:0 0 12px}
 .label-date{font-size:14px;line-height:1.4;margin-bottom:5px;font-variant-numeric:tabular-nums}
@@ -50,20 +42,16 @@
 .paper-label .label-line{margin-bottom:5px}
 .paper-label .label-bottom{border-top:0;margin-top:0;padding-top:0}
 @media(max-width:900px){
-  .workspace{gap:18px}
   #label-form{gap:20px}
-  .scale-card{padding:20px}
-  .scale-badge{display:none}
 }
 @media(max-width:699px){
   .topbar{align-items:stretch;flex-direction:column;gap:8px}
-  .topbar-scale{align-self:flex-end}
+  .topbar-devices{width:100%;align-self:stretch}
   .brand{font-size:18px}
-  .trial-banner a{margin-left:0;display:block}
   #label-form{grid-template-columns:1fr}
   .form-card{padding:22px}
   .print-actions .retain-note{margin:0 0 16px}
-  .workspace{grid-template-columns:1fr;gap:18px;margin-top:18px}
-  .scale-card{padding:22px 18px}
-  .scale-buttons .secondary{min-width:115px}
+  .workspace{margin-top:18px}
+  .preview-card{max-width:none}
+  .weight-heading{flex-wrap:wrap}
 }
