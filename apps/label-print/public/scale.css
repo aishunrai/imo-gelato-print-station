@@ -29,6 +29,7 @@
 .print-actions{display:flex;flex-direction:column;width:min(100%,420px);margin:0 auto}
 .print-actions .next-measure{width:100%;min-height:48px;margin-top:12px;font-size:14px}
 .form-card>.result{margin-top:22px}
+.form-card>.result[hidden]{display:none}
 .workspace{display:block;margin-top:24px}
 .preview-card{max-width:560px}
 .weight-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}

@@ -45,7 +45,6 @@ function renderScale({preview = false} = {}) {
   const net = netWeightFromGross($('scale-weight').value);
   $('weight').value=net == null ? '' : String(net);
   text('weight-source-label',usingScale() ? 'スケールから取得' : '手入力');
-  text('weight-help',usingScale() ? '風袋0gでケースごと計量' : 'ケース込みの重量を入力');
   if (preview) updatePreview(); else renderWeight();
 }
 
@@ -76,6 +75,7 @@ function parseXml(raw) {
   return {valid, result: doc.querySelector('result')?.textContent?.trim() || '', code: doc.querySelector('code')?.textContent?.trim() || ''};
 }
 function result(title, detail, kind = '') {
+  $('result').hidden = false;
   $('result').className = `result ${kind}`;
   text('result-title', title); text('result-detail', detail);
   $('result').setAttribute('aria-busy', String(busy));
@@ -230,7 +230,7 @@ $('demo-toggle').addEventListener('click', () => {
   text('demo-toggle', demo ? '実機印刷に戻る' : '画面を試す');
   text('history-title', demo ? '画面確認モードの発行履歴' : 'この端末の発行履歴');
   renderConnection();
-  result(demo ? '画面確認モード' : '印刷の準備', demo ? 'フレーバーと担当者を入力して、発行の流れを試せます。' : '実機印刷はAndroidで行います。最初に接続確認をしてください。', demo ? 'demo' : '');
+  $('result').hidden = true;
   renderHistory();
   renderScale();
   scheduleCloudSync();

@@ -30,6 +30,7 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([,id]) => [id, new Element()]));
   elements.set('result-icon', new Element());
   const get = id => { assert.ok(elements.has(id), `Missing HTML id: ${id}`); return elements.get(id); };
+  get('result').hidden = /id="result"[^>]*\bhidden\b/.test(html);
   const documentListeners = {};
   const document = {
     visibilityState: 'visible',
@@ -86,6 +87,16 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
 }
 function reply(raw = success) { return {ok:true, type:'cors', text:async()=>raw}; }
 function setGross(app, value) { app.get('scale-weight').value = String(value); app.input('scale-weight'); }
+
+test('idle preparation message is hidden while print feedback remains visible',async()=>{
+  const app=setup(async()=>reply());
+  assert.equal(app.get('result').hidden,true);
+  await app.click('demo-toggle');assert.equal(app.get('result').hidden,true);
+  await app.click('demo-toggle');assert.equal(app.get('result').hidden,true);
+  app.fill();await app.print();
+  assert.equal(app.get('result').hidden,false);
+  assert.equal(app.get('result-title').textContent,'ラベルの印刷が完了しました');
+});
 
 test('production release retains existing history, preferences and Sheets settings without importing test rows', async()=>{
   const row={id:'existing-production-record',flavor:'ミルク',staff:'従来担当',copies:1,weightG:2020,weightSource:'manual',
