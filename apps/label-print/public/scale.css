@@ -28,6 +28,9 @@
 .weight-grid>div{min-width:0}
 .print-actions{display:flex;flex-direction:column;width:min(100%,420px);margin:0 auto}
 .print-actions .next-measure{width:100%;min-height:48px;margin-top:12px;font-size:14px}
+.print-actions .next-measure[data-state="ready"]{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.print-actions .next-measure[data-state="ready"]:hover{background:#263d29}
+.print-actions .next-measure[data-state="inactive"]{background:#eff1ec;border-color:#dce1d7;color:#929a90;opacity:1}
 .form-card>.result{margin-top:22px}
 .form-card>.result[hidden]{display:none}
 .workspace{display:block;margin-top:24px}

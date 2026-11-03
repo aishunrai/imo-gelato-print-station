@@ -93,10 +93,11 @@ function updateControls() {
   for (const id of ['flavor','staff','scale-weight']) $(id).disabled = busy;
   for (const id of ['scale-connect','scale-disconnect','weight-mode']) $(id).disabled=busy||checking||scaleConnecting||demo;
   // A printer status request must not block the next weighing cycle.
-  $('scale-arm').disabled=busy||scaleConnecting||demo;
+  const nextMeasureReady = !busy && !scaleConnecting && !demo && scaleSession.connected && scaleMode==='usb' && !unresolved && !scaleSession.armed;
+  $('scale-arm').disabled = !nextMeasureReady;
+  $('scale-arm').dataset.state = nextMeasureReady ? 'ready' : 'inactive';
   $('scale-connect').disabled ||= scaleSession.connected || !scaleDevice.supported;
   $('scale-disconnect').disabled ||= !scaleSession.connected;
-  $('scale-arm').disabled ||= !scaleSession.connected || scaleMode!=='usb' || !!unresolved;
   $('weight-mode').disabled ||= !!unresolved;
   text('scale-support',scaleDevice.supported ? 'FTDI 0403:6001 ／ 9600bps・8N1 ／ ChromeへのUSB許可が必要です。' : 'このブラウザではUSB接続を利用できません。AndroidのChromeで開いてください。PCでは「画面を試す」を利用できます。');
   $('reconcile').hidden = !unresolved || busy;
@@ -287,7 +288,7 @@ $('scale-connect').addEventListener('click',async()=>{
 });
 $('scale-disconnect').addEventListener('click',()=>{if(!busy&&!demo)return scaleDevice.disconnect();});
 $('scale-arm').addEventListener('click',()=>{
-  if(busy||scaleConnecting||demo||activeUncertain(currentRows())||!scaleSession.connected||scaleMode!=='usb')return;
+  if(busy||scaleConnecting||demo||activeUncertain(currentRows())||!scaleSession.connected||scaleMode!=='usb'||scaleSession.armed)return;
   scaleDevice.resetFrame();scaleSession.arm();renderScale({preview:true});
   result('次の計量を開始しました','ケースを載せて計量してください。');
 });

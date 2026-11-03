@@ -156,14 +156,22 @@ test('next weighing stays available during printer status checking and visibly s
   const app=setup(async()=>reply(),{automatic:true});
   app.get('flavor').value='ミルク';app.get('staff').value='担当者';
   app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
+  assert.equal(app.get('scale-arm').disabled,true);
+  assert.equal(app.get('scale-arm').dataset.state,'inactive');
   await app.print();
   assert.equal(app.get('result-title').textContent,'ラベルの印刷が完了しました');
   app.simulate('checking=true;updateControls();');
   assert.equal(app.get('scale-arm').disabled,false);
+  assert.equal(app.get('scale-arm').dataset.state,'ready');
   app.click('scale-arm');
   assert.equal(app.simulate('scaleSession.armed'),true);
+  assert.equal(app.get('scale-arm').disabled,true);
+  assert.equal(app.get('scale-arm').dataset.state,'inactive');
   assert.equal(app.get('result-title').textContent,'次の計量を開始しました');
   assert.equal(app.get('weight').value,'');
+  app.simulate('scaleSession.accept({weightG:2150,tareG:0});renderScale({preview:true});');
+  app.click('scale-arm');
+  assert.equal(app.get('weight').value,'2000');
 });
 test('direct submit cannot bypass stale/disconnected/tampered USB capture; switching mode clears weight',async()=>{
   let prints=0;const app=setup(async()=>{prints++;return reply();},{automatic:true});
