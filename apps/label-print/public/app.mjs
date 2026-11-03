@@ -91,7 +91,9 @@ function updateControls() {
   $('demo-toggle').disabled = busy || checking || !!activeUncertain(records);
   $('export-button').disabled = busy || currentRows().length === 0;
   for (const id of ['flavor','staff','scale-weight']) $(id).disabled = busy;
-  for (const id of ['scale-connect','scale-disconnect','scale-arm','weight-mode']) $(id).disabled=busy||checking||scaleConnecting||demo;
+  for (const id of ['scale-connect','scale-disconnect','weight-mode']) $(id).disabled=busy||checking||scaleConnecting||demo;
+  // A printer status request must not block the next weighing cycle.
+  $('scale-arm').disabled=busy||scaleConnecting||demo;
   $('scale-connect').disabled ||= scaleSession.connected || !scaleDevice.supported;
   $('scale-disconnect').disabled ||= !scaleSession.connected;
   $('scale-arm').disabled ||= !scaleSession.connected || scaleMode!=='usb' || !!unresolved;
@@ -284,7 +286,11 @@ $('scale-connect').addEventListener('click',async()=>{
   finally {scaleConnecting=false;renderScale();}
 });
 $('scale-disconnect').addEventListener('click',()=>{if(!busy&&!demo)return scaleDevice.disconnect();});
-$('scale-arm').addEventListener('click',()=>{if(busy||demo||activeUncertain(currentRows()))return;scaleDevice.resetFrame();scaleSession.arm();renderScale();});
+$('scale-arm').addEventListener('click',()=>{
+  if(busy||scaleConnecting||demo||activeUncertain(currentRows())||!scaleSession.connected||scaleMode!=='usb')return;
+  scaleDevice.resetFrame();scaleSession.arm();renderScale({preview:true});
+  result('次の計量を開始しました','ケースを載せて計量してください。');
+});
 $('weight-mode').addEventListener('change',()=>{
   if(busy||demo||activeUncertain(currentRows()))return;
   scaleMode=$('weight-mode').value==='manual'?'manual':'usb';$('scale-weight').value='';$('weight').value='';

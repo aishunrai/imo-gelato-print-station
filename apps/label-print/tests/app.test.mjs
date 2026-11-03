@@ -152,6 +152,19 @@ test('USB gross 2200g shows net 2050g, prints one label, and requires a fresh ne
   app.click('scale-arm');app.simulate('scaleSession.accept({weightG:2150,tareG:0});renderScale({preview:true});');
   await app.print();assert.equal(requests.length,2);
 });
+test('next weighing stays available during printer status checking and visibly starts a new cycle',async()=>{
+  const app=setup(async()=>reply(),{automatic:true});
+  app.get('flavor').value='ミルク';app.get('staff').value='担当者';
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
+  await app.print();
+  assert.equal(app.get('result-title').textContent,'ラベルの印刷が完了しました');
+  app.simulate('checking=true;updateControls();');
+  assert.equal(app.get('scale-arm').disabled,false);
+  app.click('scale-arm');
+  assert.equal(app.simulate('scaleSession.armed'),true);
+  assert.equal(app.get('result-title').textContent,'次の計量を開始しました');
+  assert.equal(app.get('weight').value,'');
+});
 test('direct submit cannot bypass stale/disconnected/tampered USB capture; switching mode clears weight',async()=>{
   let prints=0;const app=setup(async()=>{prints++;return reply();},{automatic:true});
   app.fill();await app.print();assert.equal(prints,0);
