@@ -23,9 +23,10 @@
 #label-form>div{min-width:0}
 #label-form .field-row,#label-form .weight-field{margin-top:0}
 #label-form .field-row{grid-template-columns:1fr}
-.print-actions{display:flex;flex-direction:column;justify-content:center}
-.print-actions .retain-note{margin:0 0 18px}
-.print-actions .button-note{margin:10px 0 0}
+.weight-field,.print-actions{grid-column:1/-1}
+.weight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;align-items:end}
+.weight-grid>div{min-width:0}
+.print-actions{display:flex;flex-direction:column;width:min(100%,420px);margin:0 auto}
 .print-actions .next-measure{width:100%;min-height:48px;margin-top:12px;font-size:14px}
 .form-card>.result{margin-top:22px}
 .workspace{display:block;margin-top:24px}
@@ -36,7 +37,7 @@
 .scale-mode label{margin:0;white-space:nowrap;font-size:11px}
 .scale-mode select{width:auto;min-height:38px;margin:0;padding:4px 8px;font-size:12px}
 .weight-input input[readonly]{background:#f1f4ee;color:#243d26}
-.net-weight-field{margin-top:18px}
+.net-weight-field{display:flex;flex-direction:column;justify-content:flex-end}
 .net-weight-field label{flex-wrap:wrap}
 .paper-label{min-height:0}
 .paper-label>strong{font-size:30px;font-weight:800;line-height:1.2;padding:0 0 12px}
@@ -46,6 +47,7 @@
 .paper-label .label-bottom{border-top:0;margin-top:0;padding-top:0}
 @media(max-width:900px){
   #label-form{gap:20px}
+  .weight-grid{gap:20px}
 }
 @media(max-width:699px){
   .topbar{align-items:stretch;flex-direction:column;gap:8px}
@@ -53,8 +55,10 @@
   .brand{font-size:18px}
   #label-form{grid-template-columns:1fr}
   .form-card{padding:22px}
-  .print-actions .retain-note{margin:0 0 16px}
   .workspace{margin-top:18px}
   .preview-card{max-width:none}
   .weight-heading{flex-wrap:wrap}
+}
+@media(max-width:520px){
+  .weight-grid{grid-template-columns:1fr;gap:14px}
 }

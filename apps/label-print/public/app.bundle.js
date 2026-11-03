@@ -490,8 +490,8 @@ function renderScale({preview = false} = {}) {
   $('scale-weight').placeholder=usingScale()?'スケールから取得':'例：2150';
   const net = netWeightFromGross($('scale-weight').value);
   $('weight').value=net == null ? '' : String(net);
-  text('weight-source-label',demo ? '画面確認・手入力' : scaleMode==='usb' ? '必須・スケール自動取得' : '必須・手入力');
-  text('weight-help',usingScale() ? `風袋設定0gでケースごと計量してください。ケース重量${CASE_WEIGHT_G}gを差し引きます。` : `ケース込みの重量を入力してください。ケース重量${CASE_WEIGHT_G}gを差し引きます。`);
+  text('weight-source-label',usingScale() ? 'スケールから取得' : '手入力');
+  text('weight-help',usingScale() ? '風袋0gでケースごと計量' : 'ケース込みの重量を入力');
   if (preview) updatePreview(); else renderWeight();
 }
 
@@ -546,7 +546,6 @@ function updateControls() {
   text('scale-support',scaleDevice.supported ? 'FTDI 0403:6001 ／ 9600bps・8N1 ／ ChromeへのUSB許可が必要です。' : 'このブラウザではUSB接続を利用できません。AndroidのChromeで開いてください。PCでは「画面を試す」を利用できます。');
   $('reconcile').hidden = !unresolved || busy;
   text('print-button-text', busy ? '印刷中…' : demo ? '画面で発行を試す' : 'ラベルを印刷');
-  text('button-note', demo ? '画面確認のみ。実際のラベルは出ません。' : '印刷結果は、この画面に表示されます。');
   document.querySelectorAll('.retry-button').forEach(b => { b.disabled = busy || checking || !!unresolved || (!demo && (!android || !storageOK)); });
 }
 function snapshot() {
@@ -565,7 +564,7 @@ function renderWeight() {
   updateControls();
 }
 function updatePreview() {
-  text('preview-caption', '入力内容の確認用です。製造日時は発行時に確定します。');
+  text('preview-caption', '日時は印刷時に確定します。');
   text('preview-flavor', $('flavor').value || 'フレーバー');
   text('preview-staff', $('staff').value.trim() || '未入力');
   const judgment = assessWeight($('weight').value);
@@ -635,7 +634,7 @@ async function print(existing = null) {
     row.status = 'success'; row.detail = demo ? '画面確認のみ。プリンタには送信していません。' : '印刷サービスから成功の応答を受信しました。';
     $('scale-weight').value = ''; $('weight').value = '';
     renderWeight();
-    text('preview-caption', '直前に発行した内容です。次の入力で更新します。');
+    text('preview-caption', '直前に発行したラベルです。');
     result(demo ? '画面確認が完了しました' : 'ラベルの印刷が完了しました', `${row.detail} ${usingScale()?'次のケースは「次の計量を開始」から計量してください。':'次のケースの重量を入力してください。'}`, demo ? 'demo' : 'success');
   } catch (e) {
     if (!demo) setConnection('print-failure', {detail: e.message, code: e.code});
@@ -710,8 +709,8 @@ save('storage-check', true); persist();
 updatePreview(); renderHistory(); renderConnection();
 renderScale();
 const {minG, maxG} = weightLimits(WEIGHT_RULE);
-text('case-weight-label', `ケース重量${CASE_WEIGHT_G}gを差し引いて自動計算`);
-text('weight-range', `正味重量 ${minG}〜${maxG}g（スケール重量 ${minG+CASE_WEIGHT_G}〜${maxG+CASE_WEIGHT_G}g／ケース${CASE_WEIGHT_G}g）`);
+text('case-weight-label', `ケース${CASE_WEIGHT_G}gを差し引き`);
+text('weight-range', `印刷範囲：正味${minG}〜${maxG}g（スケール${minG+CASE_WEIGHT_G}〜${maxG+CASE_WEIGHT_G}g）`);
 if (activeUncertain(records)) result('前回の印刷結果を確認してください', activeUncertain(records).detail || 'ラベルが1枚出たか確認してから、次の印刷に進んでください。', 'unknown');
 initializeCloud();
 window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = ''; } });
