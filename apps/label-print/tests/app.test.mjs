@@ -192,6 +192,7 @@ test('returning from Smooth Print checks only status and does not lose prior pri
   assert.equal(app.get('connection-card').dataset.state, 'unverified');
   await app.visibility('visible');
   assert.equal(app.get('connection-card').dataset.state, 'unknown');
+  assert.equal(app.get('connection-title').textContent, '印刷成功・現在は未確認');
   assert.match(app.get('connection-detail').textContent, /前回の応答確認/);
   assert.equal(app.rows()[0].status, 'success');
   assert.deepEqual(requests, ['/print','/getstatus']);

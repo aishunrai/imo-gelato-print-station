@@ -17,6 +17,7 @@ test('later status failure retains last successful evidence without claiming cur
   state = connectionEvent(state, 'status-failure', {detail: '状態取得がタイムアウトしました。'});
   const view = connectionView(state);
   assert.equal(view.kind, 'unknown');
+  assert.equal(view.title, '印刷成功・現在は未確認');
   assert.match(view.detail, /前回の応答確認/);
   assert.match(view.detail, /未接続とは限りません/);
 });

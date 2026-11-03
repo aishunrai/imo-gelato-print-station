@@ -51,7 +51,16 @@ test('requires explicit SUCCESS and reconciles even partial printer failures',()
   assert.equal(interpretReply({result:'Ready'},'status').result,'Ready');
 });
 test('status check never calls print and cannot itself print a label',async()=> {
-  await requestPrinter('status',null,{fetchImpl:async url=>{assert.equal(new URL(url).pathname,'/getstatus');return {ok:true,text:async()=>'<response/>'};},parseXml:()=>({result:'Ready'})});
+  await requestPrinter('status',null,{fetchImpl:async url=>{
+    const target=new URL(url);
+    assert.equal(target.pathname,'/getstatus');
+    assert.equal(target.searchParams.get('statuscallback'),'sendurlscheme://successCallback?result=');
+    assert.match(target.search,/statuscallback=sendurlscheme%3A%2F%2FsuccessCallback%3Fresult%3D/);
+    return {ok:true,text:async()=>'<response/>'};
+  },parseXml:()=>({result:'Ready'})});
+  assert.equal(interpretReply({result:'正常',code:'NoError'},'status').code,'NoError');
+  assert.equal(interpretReply({result:'',code:'NoError'},'status').code,'NoError');
+  assert.throws(()=>interpretReply({result:'プリンターのカバーが開いています',code:'PrinterStatusErrorCoverOpen'},'status'));
 });
 test('interrupted print stays locked after reload until operator reconciliation',()=> {
   const rows=recoverHistory([{id:'record-1',...label,status:'pending'}, {id:'record-2',...label,status:'success'}]);

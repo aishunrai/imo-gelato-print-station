@@ -50,6 +50,7 @@ function formatManufacturedAt(value) {
 const FLAVORS = ['ピスタチオ','チョコ','白桃','伊勢抹茶','ほうじ茶','ほし芋','ほし芋ﾌﾟﾚﾐｱﾑ','レモン','ミルク','苺','小倉餡','さくら','マンゴー','和栗','黒胡麻きなこ'];
 const ENDPOINT = 'http://localhost:8088';
 const TEMPLATE = 'gelato-label-v3.lbx';
+const STATUS_CALLBACK = 'sendurlscheme://successCallback?result=';
 
 function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
@@ -88,10 +89,10 @@ class PrintError extends Error {
 
 // No XML outcome or unreadable cross-origin response can prove that no label printed.
 function interpretReply({result, code = '', valid = true}, operation) {
-  if (!valid || !result) throw new PrintError('応答を確認できませんでした。ラベルが出たか確認してください。', operation === 'print');
-  const noError = !code || code === 'SUCCESS';
+  if (!valid || (!result && !(operation === 'status' && code === 'NoError'))) throw new PrintError('応答を確認できませんでした。ラベルが出たか確認してください。', operation === 'print');
+  const noError = !code || code === 'SUCCESS' || (operation === 'status' && code === 'NoError');
   if (operation === 'print' && result === 'SUCCESS' && noError) return {result, code};
-  if (operation === 'status' && noError && ['SUCCESS', 'Ready'].includes(result)) return {result, code};
+  if (operation === 'status' && noError && (['SUCCESS', 'Ready', 'NoError'].includes(result) || code === 'NoError')) return {result, code};
   const known = {
     PrinterStatusErrorCoverOpen: 'プリンタのカバーを閉じてください。',
     PrinterStatusErrorNoPaper: 'ラベル用紙を補充してください。',
@@ -105,7 +106,8 @@ function interpretReply({result, code = '', valid = true}, operation) {
 
 async function requestPrinter(operation, label, {fetchImpl = fetch, parseXml, timeoutMs = 30000} = {}) {
   if (!['print','status'].includes(operation)) throw new Error('Unsupported operation');
-  const url = operation === 'print' ? printUrl(label) : new URL('/getstatus', ENDPOINT).toString();
+  const url = operation === 'print' ? printUrl(label)
+    : `${new URL('/getstatus', ENDPOINT)}?statuscallback=${encodeURIComponent(STATUS_CALLBACK)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -165,7 +167,7 @@ function connectionView(state, {android = true, demo = false} = {}) {
       detail: `${previous}${state.lastSuccess.source === 'print-success' ? '印刷成功の応答を受信しました。' : 'プリンタの正常応答を受信しました。'} 現在の状態は「接続確認」で再確認できます。`,
     };
     case 'warning': return {kind: 'warning', title: 'プリンタの確認が必要です', detail: `${state.detail} ${previous}`.trim()};
-    case 'unknown': return {kind: 'unknown', title: '状態を確認できません', detail: `${state.detail} ${previous} 未接続とは限りません。「接続確認」で再確認してください。`.trim()};
+    case 'unknown': return {kind: 'unknown', title: state.lastSuccess?.source === 'print-success' ? '印刷成功・現在は未確認' : '状態を確認できません', detail: `${state.detail} ${previous} 未接続とは限りません。「接続確認」で再確認してください。`.trim()};
     default: return {kind: 'unverified', title: '接続は未確認です', detail: `${previous}「接続確認」で現在の状態を取得できます。`.trim()};
   }
 }

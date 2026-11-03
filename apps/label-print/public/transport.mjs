@@ -3,6 +3,7 @@ import {WEIGHT_RULE} from './config.mjs';
 import {assessWeight, formatManufacturedAt} from './production.mjs';
 export const ENDPOINT = 'http://localhost:8088';
 export const TEMPLATE = 'gelato-label-v3.lbx';
+const STATUS_CALLBACK = 'sendurlscheme://successCallback?result=';
 
 export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
@@ -41,10 +42,10 @@ export class PrintError extends Error {
 
 // No XML outcome or unreadable cross-origin response can prove that no label printed.
 export function interpretReply({result, code = '', valid = true}, operation) {
-  if (!valid || !result) throw new PrintError('応答を確認できませんでした。ラベルが出たか確認してください。', operation === 'print');
-  const noError = !code || code === 'SUCCESS';
+  if (!valid || (!result && !(operation === 'status' && code === 'NoError'))) throw new PrintError('応答を確認できませんでした。ラベルが出たか確認してください。', operation === 'print');
+  const noError = !code || code === 'SUCCESS' || (operation === 'status' && code === 'NoError');
   if (operation === 'print' && result === 'SUCCESS' && noError) return {result, code};
-  if (operation === 'status' && noError && ['SUCCESS', 'Ready'].includes(result)) return {result, code};
+  if (operation === 'status' && noError && (['SUCCESS', 'Ready', 'NoError'].includes(result) || code === 'NoError')) return {result, code};
   const known = {
     PrinterStatusErrorCoverOpen: 'プリンタのカバーを閉じてください。',
     PrinterStatusErrorNoPaper: 'ラベル用紙を補充してください。',
@@ -58,7 +59,8 @@ export function interpretReply({result, code = '', valid = true}, operation) {
 
 export async function requestPrinter(operation, label, {fetchImpl = fetch, parseXml, timeoutMs = 30000} = {}) {
   if (!['print','status'].includes(operation)) throw new Error('Unsupported operation');
-  const url = operation === 'print' ? printUrl(label) : new URL('/getstatus', ENDPOINT).toString();
+  const url = operation === 'print' ? printUrl(label)
+    : `${new URL('/getstatus', ENDPOINT)}?statuscallback=${encodeURIComponent(STATUS_CALLBACK)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

@@ -30,7 +30,7 @@ export function connectionView(state, {android = true, demo = false} = {}) {
       detail: `${previous}${state.lastSuccess.source === 'print-success' ? '印刷成功の応答を受信しました。' : 'プリンタの正常応答を受信しました。'} 現在の状態は「接続確認」で再確認できます。`,
     };
     case 'warning': return {kind: 'warning', title: 'プリンタの確認が必要です', detail: `${state.detail} ${previous}`.trim()};
-    case 'unknown': return {kind: 'unknown', title: '状態を確認できません', detail: `${state.detail} ${previous} 未接続とは限りません。「接続確認」で再確認してください。`.trim()};
+    case 'unknown': return {kind: 'unknown', title: state.lastSuccess?.source === 'print-success' ? '印刷成功・現在は未確認' : '状態を確認できません', detail: `${state.detail} ${previous} 未接続とは限りません。「接続確認」で再確認してください。`.trim()};
     default: return {kind: 'unverified', title: '接続は未確認です', detail: `${previous}「接続確認」で現在の状態を取得できます。`.trim()};
   }
 }
