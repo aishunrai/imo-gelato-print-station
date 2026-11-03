@@ -41,10 +41,9 @@ function renderScale({preview = false} = {}) {
   if (usingScale()) $('scale-weight').value=usableScaleWeight() ? String(scaleSession.reading.weightG) : '';
   $('scale-weight').readOnly=usingScale();
   $('weight').readOnly=true;
-  $('scale-weight').placeholder=usingScale()?'スケールから取得':'例：2150';
+  $('scale-weight').placeholder=usingScale()?'':'例：2150';
   const net = netWeightFromGross($('scale-weight').value);
   $('weight').value=net == null ? '' : String(net);
-  text('weight-source-label',usingScale() ? 'スケールから取得' : '手入力');
   if (preview) updatePreview(); else renderWeight();
 }
 
@@ -118,7 +117,6 @@ function renderWeight() {
   updateControls();
 }
 function updatePreview() {
-  text('preview-caption', '日時は印刷時に確定します。');
   text('preview-flavor', $('flavor').value || 'フレーバー');
   text('preview-staff', $('staff').value.trim() || '未入力');
   const judgment = assessWeight($('weight').value);
@@ -188,7 +186,6 @@ async function print(existing = null) {
     row.status = 'success'; row.detail = demo ? '画面確認のみ。プリンタには送信していません。' : '印刷サービスから成功の応答を受信しました。';
     $('scale-weight').value = ''; $('weight').value = '';
     renderWeight();
-    text('preview-caption', '直前に発行したラベルです。');
     result(demo ? '画面確認が完了しました' : 'ラベルの印刷が完了しました', `${row.detail} ${usingScale()?'次のケースは「次の計量を開始」から計量してください。':'次のケースの重量を入力してください。'}`, demo ? 'demo' : 'success');
   } catch (e) {
     if (!demo) setConnection('print-failure', {detail: e.message, code: e.code});
@@ -263,7 +260,6 @@ save('storage-check', true); persist();
 updatePreview(); renderHistory(); renderConnection();
 renderScale();
 const {minG, maxG} = weightLimits(WEIGHT_RULE);
-text('case-weight-label', `ケース${CASE_WEIGHT_G}gを差し引き`);
 text('weight-range', `印刷範囲：正味${minG}〜${maxG}g（スケール${minG+CASE_WEIGHT_G}〜${maxG+CASE_WEIGHT_G}g）`);
 if (activeUncertain(records)) result('前回の印刷結果を確認してください', activeUncertain(records).detail || 'ラベルが1枚出たか確認してから、次の印刷に進んでください。', 'unknown');
 initializeCloud();
