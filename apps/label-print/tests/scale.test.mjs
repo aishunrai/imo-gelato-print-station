@@ -4,7 +4,7 @@ import {parseScaleLine,createScaleFramer,ftdiPayload,createScaleSession,createFt
 const frame=(weight=702,tare=334)=>`{0,16,~0,1,MO,"TL-280",Wg,${weight},Pt,${tare}`;
 const ascii=value=>new TextEncoder().encode(value);
 
-test('actual operator samples use Wg as net weight without subtracting Pt twice',()=>{
+test('TL-280 Wg is the displayed value and Pt identifies a remaining tare',()=>{
   assert.equal(parseScaleLine(frame(702,0)).weightG,702);
   assert.equal(parseScaleLine(frame(334,0)).tareG,0);
   assert.deepEqual(parseScaleLine(frame()),{weightG:702,tareG:334,raw:frame()});
@@ -29,7 +29,8 @@ test('FTDI removes status bytes from every packet and refuses line errors and tr
 test('capture requires a live connection; consumption, reconnect, expiry and clock reversal invalidate old weight',()=>{
   let clock=100000;const session=createScaleSession({now:()=>clock});
   assert.equal(session.accept(parseScaleLine(frame())),false);assert.throws(()=>session.snapshot());
-  session.connect();session.accept(parseScaleLine(frame(2050,334)));assert.equal(session.snapshot().weightG,2050);
+  session.connect();session.accept(parseScaleLine(frame(2150,334)));assert.throws(()=>session.snapshot(),/風袋設定/);
+  session.accept(parseScaleLine(frame(2150,0)));assert.equal(session.snapshot().weightG,2150);
   session.pause('used');session.accept(parseScaleLine(frame(2100,0)));assert.throws(()=>session.snapshot());
   session.arm();assert.throws(()=>session.snapshot());session.accept(parseScaleLine(frame(2000,0)));
   clock+=29999;assert.equal(session.snapshot().weightG,2000);clock++;assert.throws(()=>session.snapshot());assert.equal(session.expire(),true);

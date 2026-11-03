@@ -5,7 +5,7 @@ export const ENDPOINT = 'http://localhost:8088';
 export const TEMPLATE = 'gelato-label-v3.lbx';
 const STATUS_CALLBACK = 'sendurlscheme://successCallback?result=';
 
-export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
+export function validateLabel({flavor, staff, copies, weightG, grossWeightG, caseWeightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
   if (typeof staff !== 'string' || !staff.trim()) throw new Error('担当者名を入力してください。');
   if (staff.trim().length > 40) throw new Error('担当者名は40文字以内で入力してください。');
@@ -13,11 +13,15 @@ export function validateLabel({flavor, staff, copies, weightG, weightRule = WEIG
   if (String(copies).trim() === '' || !Number.isInteger(n) || n < 1 || n > 50) throw new Error('印刷枚数は1〜50の整数で入力してください。');
   const assessment = assessWeight(weightG, weightRule);
   if (!assessment.accepted) throw new Error(assessment.message);
+  const hasGross = grossWeightG !== undefined || caseWeightG !== undefined;
+  if (hasGross && (!Number.isSafeInteger(grossWeightG) || !Number.isSafeInteger(caseWeightG) || caseWeightG < 0 || grossWeightG - caseWeightG !== assessment.weightG)) throw new Error('スケール重量と正味重量が一致しません。再計量してください。');
   if (manufacturedAt !== undefined) formatManufacturedAt(manufacturedAt);
   if (!['manual','scale-usb'].includes(weightSource)) throw new Error('重量の取得方法が不正です。');
   if (weightSource==='scale-usb' && (!Number.isInteger(tareG) || tareG<0 || !Number.isFinite(Date.parse(weightReceivedAt)))) throw new Error('重量の受信情報がありません。再計量してください。');
+  if (hasGross && weightSource==='scale-usb' && tareG !== 0) throw new Error('風袋設定を0gにして再計量してください。');
   return {flavor, staff: staff.trim(), copies: n, weightG:assessment.weightG,
     weightSource, weightRule:{...weightRule}, judgment:'pass',
+    ...(hasGross?{grossWeightG,caseWeightG}:{}),
     ...(weightSource==='scale-usb'?{tareG,weightReceivedAt}:{}),
     ...(manufacturedAt === undefined ? {} : {manufacturedAt})};
 }

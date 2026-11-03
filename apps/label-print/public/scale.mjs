@@ -10,7 +10,7 @@ export function parseScaleLine(line) {
     || !/^\d{1,6}$/.test(fields[7]) || !/^\d{1,6}$/.test(fields[9])) throw new Error('TL-280の重量データを確認できません。載せ直して再計量してください。');
   const weightG = Number(fields[7]), tareG = Number(fields[9]);
   if (weightG + tareG > 8000 || tareG > 4000) throw new Error('8kg仕様の計量範囲を超えるデータです。');
-  return {weightG, tareG, raw:clean}; // Wg is already net; never subtract Pt again.
+  return {weightG, tareG, raw:clean}; // Wg is the scale display; Pt must be zero for gross-case weighing.
 }
 
 export function createScaleFramer(onReading, onInvalid) {
@@ -54,22 +54,23 @@ export function createScaleSession({now = () => Date.now()} = {}) {
     get armed() { return armed; },
     get reading() { return reading; },
     get reason() { return reason; },
-    connect() { connected = true; armed = true; reading = null; reason = '接続済みです。空ケースを風袋引きして計量してください。'; },
+    connect() { connected = true; armed = true; reading = null; reason = '接続済みです。風袋設定が0gであることを確認し、ケースごと計量してください。'; },
     disconnect(message = 'スケールが切断されました。再接続してください。') { connected = false; armed = false; reading = null; reason = message; },
     invalidate(message = '重量を再取得してください。') { reading = null; reason = message; },
     pause(message) { armed = false; reading = null; reason = connected ? message : 'スケールを接続してください。'; },
     arm() {
       reading = null; armed = connected;
-      reason = connected ? 'ケースを載せ替えて、風袋引き後に計量してください。' : 'スケールを接続してください。';
+      reason = connected ? 'ケースを載せ替え、風袋設定0gで計量してください。' : 'スケールを接続してください。';
     },
     accept(value) {
       if (!connected || !armed) return false;
       reading = {...value, receivedAt:new Date(now()).toISOString(), receivedMs:now()};
-      reason = 'スケールから重量を取得しました。'; return true;
+      reason = value.tareG === 0 ? 'スケール重量を取得しました。' : '風袋設定が残っています。風袋を解除してPtが0gの状態で計量してください。'; return true;
     },
     snapshot() {
       const age = reading ? now() - reading.receivedMs : Infinity;
       if (!connected || !armed || !reading || age < 0 || age >= SCALE_MAX_AGE_MS) throw new Error('有効な重量がありません。「次の計量を開始」から再計量してください。');
+      if (reading.tareG !== 0) throw new Error('風袋設定が残っています。Ptを0gにして再計量してください。');
       return {weightG:reading.weightG, tareG:reading.tareG, weightReceivedAt:reading.receivedAt, weightSource:'scale-usb'};
     },
     expire() {

@@ -5,6 +5,8 @@
 // config.mjs
 // Change these values when the case standard changes. Existing records keep their own copy.
 const WEIGHT_RULE = Object.freeze({baseWeightG: 2000, upperTolerancePercent: 5});
+// Temporary standard case weight. Change here when the measured case weight is confirmed.
+const CASE_WEIGHT_G = 150;
 
 // cloud-config.mjs
 // Public destination only. Never put the device's saving key in GitHub.
@@ -15,6 +17,12 @@ const CLOUD_CONFIG = Object.freeze({
 });
 
 // production.mjs
+function netWeightFromGross(rawGross, caseWeightG = CASE_WEIGHT_G) {
+  const value = rawGross == null ? '' : String(rawGross).trim();
+  if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || !Number.isSafeInteger(caseWeightG) || caseWeightG < 0) return null;
+  return Number(value) - caseWeightG;
+}
+
 function weightLimits(rule = WEIGHT_RULE) {
   if (!rule || !Number.isSafeInteger(rule.baseWeightG) || rule.baseWeightG <= 0 ||
       !Number.isFinite(rule.upperTolerancePercent) || rule.upperTolerancePercent < 0 || rule.upperTolerancePercent > 100) {
@@ -26,7 +34,7 @@ function weightLimits(rule = WEIGHT_RULE) {
 function assessWeight(raw, rule = WEIGHT_RULE) {
   const {minG, maxG} = weightLimits(rule);
   const value = raw == null ? '' : String(raw).trim();
-  if (!value) return {status:'empty', accepted:false, message:'正味重量を入力してください。', minG, maxG};
+  if (!value) return {status:'empty', accepted:false, message:'正味重量を取得してください。', minG, maxG};
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
     return {status:'invalid', accepted:false, message:'重量はg単位の正の整数で入力してください。', minG, maxG};
   }
@@ -52,7 +60,7 @@ const ENDPOINT = 'http://localhost:8088';
 const TEMPLATE = 'gelato-label-v3.lbx';
 const STATUS_CALLBACK = 'sendurlscheme://successCallback?result=';
 
-function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
+function validateLabel({flavor, staff, copies, weightG, grossWeightG, caseWeightG, weightRule = WEIGHT_RULE, manufacturedAt, weightSource = 'manual', tareG, weightReceivedAt}) {
   if (!FLAVORS.includes(flavor)) throw new Error('フレーバーを選択してください。');
   if (typeof staff !== 'string' || !staff.trim()) throw new Error('担当者名を入力してください。');
   if (staff.trim().length > 40) throw new Error('担当者名は40文字以内で入力してください。');
@@ -60,11 +68,15 @@ function validateLabel({flavor, staff, copies, weightG, weightRule = WEIGHT_RULE
   if (String(copies).trim() === '' || !Number.isInteger(n) || n < 1 || n > 50) throw new Error('印刷枚数は1〜50の整数で入力してください。');
   const assessment = assessWeight(weightG, weightRule);
   if (!assessment.accepted) throw new Error(assessment.message);
+  const hasGross = grossWeightG !== undefined || caseWeightG !== undefined;
+  if (hasGross && (!Number.isSafeInteger(grossWeightG) || !Number.isSafeInteger(caseWeightG) || caseWeightG < 0 || grossWeightG - caseWeightG !== assessment.weightG)) throw new Error('スケール重量と正味重量が一致しません。再計量してください。');
   if (manufacturedAt !== undefined) formatManufacturedAt(manufacturedAt);
   if (!['manual','scale-usb'].includes(weightSource)) throw new Error('重量の取得方法が不正です。');
   if (weightSource==='scale-usb' && (!Number.isInteger(tareG) || tareG<0 || !Number.isFinite(Date.parse(weightReceivedAt)))) throw new Error('重量の受信情報がありません。再計量してください。');
+  if (hasGross && weightSource==='scale-usb' && tareG !== 0) throw new Error('風袋設定を0gにして再計量してください。');
   return {flavor, staff: staff.trim(), copies: n, weightG:assessment.weightG,
     weightSource, weightRule:{...weightRule}, judgment:'pass',
+    ...(hasGross?{grossWeightG,caseWeightG}:{}),
     ...(weightSource==='scale-usb'?{tareG,weightReceivedAt}:{}),
     ...(manufacturedAt === undefined ? {} : {manufacturedAt})};
 }
@@ -288,7 +300,7 @@ function parseScaleLine(line) {
     || !/^\d{1,6}$/.test(fields[7]) || !/^\d{1,6}$/.test(fields[9])) throw new Error('TL-280の重量データを確認できません。載せ直して再計量してください。');
   const weightG = Number(fields[7]), tareG = Number(fields[9]);
   if (weightG + tareG > 8000 || tareG > 4000) throw new Error('8kg仕様の計量範囲を超えるデータです。');
-  return {weightG, tareG, raw:clean}; // Wg is already net; never subtract Pt again.
+  return {weightG, tareG, raw:clean}; // Wg is the scale display; Pt must be zero for gross-case weighing.
 }
 
 function createScaleFramer(onReading, onInvalid) {
@@ -332,22 +344,23 @@ function createScaleSession({now = () => Date.now()} = {}) {
     get armed() { return armed; },
     get reading() { return reading; },
     get reason() { return reason; },
-    connect() { connected = true; armed = true; reading = null; reason = '接続済みです。空ケースを風袋引きして計量してください。'; },
+    connect() { connected = true; armed = true; reading = null; reason = '接続済みです。風袋設定が0gであることを確認し、ケースごと計量してください。'; },
     disconnect(message = 'スケールが切断されました。再接続してください。') { connected = false; armed = false; reading = null; reason = message; },
     invalidate(message = '重量を再取得してください。') { reading = null; reason = message; },
     pause(message) { armed = false; reading = null; reason = connected ? message : 'スケールを接続してください。'; },
     arm() {
       reading = null; armed = connected;
-      reason = connected ? 'ケースを載せ替えて、風袋引き後に計量してください。' : 'スケールを接続してください。';
+      reason = connected ? 'ケースを載せ替え、風袋設定0gで計量してください。' : 'スケールを接続してください。';
     },
     accept(value) {
       if (!connected || !armed) return false;
       reading = {...value, receivedAt:new Date(now()).toISOString(), receivedMs:now()};
-      reason = 'スケールから重量を取得しました。'; return true;
+      reason = value.tareG === 0 ? 'スケール重量を取得しました。' : '風袋設定が残っています。風袋を解除してPtが0gの状態で計量してください。'; return true;
     },
     snapshot() {
       const age = reading ? now() - reading.receivedMs : Infinity;
       if (!connected || !armed || !reading || age < 0 || age >= SCALE_MAX_AGE_MS) throw new Error('有効な重量がありません。「次の計量を開始」から再計量してください。');
+      if (reading.tareG !== 0) throw new Error('風袋設定が残っています。Ptを0gにして再計量してください。');
       return {weightG:reading.weightG, tareG:reading.tareG, weightReceivedAt:reading.receivedAt, weightSource:'scale-usb'};
     },
     expire() {
@@ -469,13 +482,16 @@ function renderScale({preview = false} = {}) {
   $('header-scale-status').hidden = !scaleSession.connected;
   text('scale-title',scaleConnecting ? 'スケールに接続しています…' : demo ? '画面確認モード' : scaleSession.connected ? 'スケール接続済み' : 'スケール未接続');
   text('scale-message',demo ? 'USBの受信値は使用せず、重量を手入力して画面を確認できます。' : scaleMode==='manual' ? '手入力で発行します。スケールの受信値は採用しません。' : scaleSession.reason);
-  text('scale-tare',scaleSession.reading ? `風袋 ${scaleSession.reading.tareG} g ／ ${new Date(scaleSession.reading.receivedAt).toLocaleTimeString('ja-JP')} 受信` : '受信したWgを正味重量として使用します。');
+  text('scale-tare',scaleSession.reading ? `風袋設定 Pt ${scaleSession.reading.tareG} g ／ ${new Date(scaleSession.reading.receivedAt).toLocaleTimeString('ja-JP')} 受信` : '風袋設定は0gにしてください。');
   if (busy) { updateControls(); return; }
-  if (usingScale() && !busy) $('weight').value=usableScaleWeight() ? String(scaleSession.reading.weightG) : '';
-  $('weight').readOnly=usingScale();
-  $('weight').placeholder=usingScale()?'スケールから取得':'例：2000';
+  if (usingScale()) $('scale-weight').value=usableScaleWeight() ? String(scaleSession.reading.weightG) : '';
+  $('scale-weight').readOnly=usingScale();
+  $('weight').readOnly=true;
+  $('scale-weight').placeholder=usingScale()?'スケールから取得':'例：2150';
+  const net = netWeightFromGross($('scale-weight').value);
+  $('weight').value=net == null ? '' : String(net);
   text('weight-source-label',demo ? '画面確認・手入力' : scaleMode==='usb' ? '必須・スケール自動取得' : '必須・手入力');
-  text('weight-help',usingScale() ? '空ケースを風袋引きしてから計量してください。表示が安定すると自動反映します。' : 'ケースの重量を除いた、ジェラートの重量を入力してください。');
+  text('weight-help',usingScale() ? `風袋設定0gでケースごと計量してください。ケース重量${CASE_WEIGHT_G}gを差し引きます。` : `ケース込みの重量を入力してください。ケース重量${CASE_WEIGHT_G}gを差し引きます。`);
   if (preview) updatePreview(); else renderWeight();
 }
 
@@ -516,11 +532,12 @@ document.querySelector('.result-icon').id = 'result-icon';
 
 function updateControls() {
   const unresolved = activeUncertain(currentRows());
-  $('print-button').disabled = busy || checking || scaleConnecting || !!unresolved || !assessWeight($('weight').value).accepted || (usingScale() && !usableScaleWeight()) || (!demo && (!android || !storageOK));
+  const net = netWeightFromGross($('scale-weight').value);
+  $('print-button').disabled = busy || checking || scaleConnecting || !!unresolved || !assessWeight(net).accepted || String(net)!==$('weight').value || (usingScale() && !usableScaleWeight()) || (!demo && (!android || !storageOK));
   $('check-button').disabled = busy || checking;
   $('demo-toggle').disabled = busy || checking || !!activeUncertain(records);
   $('export-button').disabled = busy || currentRows().length === 0;
-  for (const id of ['flavor','staff','copies','weight']) $(id).disabled = busy;
+  for (const id of ['flavor','staff','scale-weight']) $(id).disabled = busy;
   for (const id of ['scale-connect','scale-disconnect','scale-arm','weight-mode']) $(id).disabled=busy||checking||scaleConnecting||demo;
   $('scale-connect').disabled ||= scaleSession.connected || !scaleDevice.supported;
   $('scale-disconnect').disabled ||= !scaleSession.connected;
@@ -533,21 +550,24 @@ function updateControls() {
   document.querySelectorAll('.retry-button').forEach(b => { b.disabled = busy || checking || !!unresolved || (!demo && (!android || !storageOK)); });
 }
 function snapshot() {
-  const measured = usingScale() ? scaleSession.snapshot() : {weightG:$('weight').value, weightSource:'manual'};
-  if (usingScale() && String(measured.weightG)!==$('weight').value) throw new Error('表示重量が受信値と一致しません。再計量してください。');
-  return {flavor: $('flavor').value, staff: $('staff').value, copies: $('copies').value, ...measured};
+  const measured = usingScale() ? scaleSession.snapshot() : {weightG:$('scale-weight').value, weightSource:'manual'};
+  const net = netWeightFromGross(measured.weightG);
+  if (net == null || String(measured.weightG)!==$('scale-weight').value || String(net)!==$('weight').value) throw new Error('表示重量が計量値と一致しません。再計量してください。');
+  return {flavor: $('flavor').value, staff: $('staff').value, copies: 1, ...measured,
+    grossWeightG:Number(measured.weightG), caseWeightG:CASE_WEIGHT_G, weightG:net};
 }
 function renderWeight() {
   const judgment = assessWeight($('weight').value);
-  $('weight-judgment').dataset.state = judgment.status;
-  text('weight-judgment', usingScale() && judgment.status==='empty' ? 'スケールから重量を取得してください。' : judgment.message);
+  const tareLeft = usingScale() && scaleSession.reading && scaleSession.reading.tareG !== 0;
+  $('weight-judgment').dataset.state = tareLeft ? 'invalid' : judgment.status;
+  text('weight-judgment', tareLeft ? scaleSession.reason
+    : usingScale() && judgment.status==='empty' ? 'スケールから重量を取得してください。' : judgment.message);
   updateControls();
 }
 function updatePreview() {
   text('preview-caption', '入力内容の確認用です。製造日時は発行時に確定します。');
   text('preview-flavor', $('flavor').value || 'フレーバー');
   text('preview-staff', $('staff').value.trim() || '未入力');
-  text('preview-copies', $('copies').value || '—');
   const judgment = assessWeight($('weight').value);
   text('preview-weight', judgment.weightG == null ? '未入力' : `${judgment.weightG} g`);
   text('preview-manufactured-at', '発行時に自動取得');
@@ -605,7 +625,6 @@ async function print(existing = null) {
   text('preview-flavor', row.flavor);
   text('preview-staff', row.staff);
   text('preview-weight', `${row.weightG} g`);
-  text('preview-copies', row.copies);
   text('preview-manufactured-at', formatManufacturedAt(row.manufacturedAt));
   result(demo ? '画面で発行を確認しています' : 'ラベルを印刷しています', 'そのままお待ちください。続けて押す必要はありません。', demo ? 'demo' : '');
   renderHistory();
@@ -614,7 +633,7 @@ async function print(existing = null) {
     else await requestPrinter('print', label, {parseXml});
     if (!demo) setConnection('print-success');
     row.status = 'success'; row.detail = demo ? '画面確認のみ。プリンタには送信していません。' : '印刷サービスから成功の応答を受信しました。';
-    $('weight').value = '';
+    $('scale-weight').value = ''; $('weight').value = '';
     renderWeight();
     text('preview-caption', '直前に発行した内容です。次の入力で更新します。');
     result(demo ? '画面確認が完了しました' : 'ラベルの印刷が完了しました', `${row.detail} ${usingScale()?'次のケースは「次の計量を開始」から計量してください。':'次のケースの重量を入力してください。'}`, demo ? 'demo' : 'success');
@@ -633,7 +652,12 @@ async function print(existing = null) {
 }
 
 $('label-form').addEventListener('submit', async e => { e.preventDefault(); await print(); });
-for (const id of ['flavor','staff','copies','weight']) $(id).addEventListener('input', updatePreview);
+for (const id of ['flavor','staff']) $(id).addEventListener('input', updatePreview);
+$('scale-weight').addEventListener('input', () => {
+  const net = netWeightFromGross($('scale-weight').value);
+  $('weight').value = net == null ? '' : String(net);
+  updatePreview();
+});
 async function checkConnection() {
   if (busy || checking) return;
   if (demo || !android) { renderConnection(); return; }
@@ -649,7 +673,7 @@ $('check-button').addEventListener('click', checkConnection);
 $('demo-toggle').addEventListener('click', () => {
   if (busy || checking || activeUncertain(records)) return;
   demo = !demo; $('demo-note').hidden = !demo; $('demo-toggle').setAttribute('aria-pressed', String(demo));
-  scaleSession.pause('「次の計量を開始」から再計量してください。'); $('weight').value='';
+  scaleSession.pause('「次の計量を開始」から再計量してください。'); $('scale-weight').value=''; $('weight').value='';
   text('demo-toggle', demo ? '実機印刷に戻る' : '画面を試す');
   text('history-title', demo ? '画面確認モードの発行履歴' : 'この端末の発行履歴');
   renderConnection();
@@ -660,9 +684,9 @@ $('demo-toggle').addEventListener('click', () => {
 });
 function reconcile(status) {
   const row = activeUncertain(currentRows()); if (!row || busy) return;
-  row.status = status; row.detail = status === 'confirmed' ? '作業者が必要枚数の印刷を確認しました。' : '作業者が未完了と確認しました。';
+  row.status = status; row.detail = status === 'confirmed' ? '作業者がラベル1枚の印刷を確認しました。' : '作業者が未完了と確認しました。';
   if (!demo) { markLogChanged(row, cloudProject()); persist(); }
-  if (status === 'confirmed') { $('weight').value = ''; renderWeight(); }
+  if (status === 'confirmed') { $('scale-weight').value = ''; $('weight').value = ''; renderWeight(); }
   result(status === 'confirmed' ? '印刷済みとして記録しました' : '未完了として記録しました', status === 'confirmed' ? '次のラベルを発行できます。' : '再発行する場合は、履歴の「同じ内容を再発行」を押してください。', status === 'confirmed' ? 'success' : 'error');
   renderHistory();
   scheduleCloudSync();
@@ -671,7 +695,7 @@ $('confirm-printed').addEventListener('click', () => reconcile('confirmed'));
 $('confirm-not-printed').addEventListener('click', () => reconcile('failed'));
 $('export-button').addEventListener('click', () => {
   const cell = value => { let s = String(value ?? ''); if (/^\s*[=+@-]/.test(s)) s = `'${s}`; return `"${s.replaceAll('"','""')}"`; };
-  const rows = [['記録ID','登録日時UTC','製造日時_日本時間','製造日時UTC','フレーバー','担当者','正味重量g','重量取得方法','基準重量g','許容上限率％','判定','ラベル枚数','状態','発行操作回数','最終発行操作日時UTC','詳細','風袋量g','重量受信日時UTC'], ...currentRows().map(r => [r.id,r.createdAt,r.manufacturedAt ? formatManufacturedAt(r.manufacturedAt) : '',r.manufacturedAt,r.flavor,r.staff,r.weightG,r.weightSource,r.weightRule?.baseWeightG,r.weightRule?.upperTolerancePercent,r.judgment,r.copies,statusNames[r.status],r.attempts,r.lastAttemptAt,r.detail,r.tareG,r.weightReceivedAt])];
+  const rows = [['記録ID','登録日時UTC','製造日時_日本時間','製造日時UTC','フレーバー','担当者','正味重量g','重量取得方法','基準重量g','許容上限率％','判定','ラベル枚数','状態','発行操作回数','最終発行操作日時UTC','詳細','風袋量g','重量受信日時UTC','スケール重量g','ケース重量g'], ...currentRows().map(r => [r.id,r.createdAt,r.manufacturedAt ? formatManufacturedAt(r.manufacturedAt) : '',r.manufacturedAt,r.flavor,r.staff,r.weightG,r.weightSource,r.weightRule?.baseWeightG,r.weightRule?.upperTolerancePercent,r.judgment,r.copies,statusNames[r.status],r.attempts,r.lastAttemptAt,r.detail,r.tareG,r.weightReceivedAt,r.grossWeightG,r.caseWeightG])];
   const blob = new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${demo ? '画面確認' : 'ラベル発行履歴'}_${formatManufacturedAt(new Date().toISOString()).slice(0,10).replaceAll('/','-')}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 });
@@ -686,8 +710,9 @@ save('storage-check', true); persist();
 updatePreview(); renderHistory(); renderConnection();
 renderScale();
 const {minG, maxG} = weightLimits(WEIGHT_RULE);
-text('weight-range', `1ケース＝1B ／ ${minG}〜${maxG}g（基準${minG}g・＋${WEIGHT_RULE.upperTolerancePercent}％まで）`);
-if (activeUncertain(records)) result('前回の印刷結果を確認してください', activeUncertain(records).detail || '必要枚数のラベルが出たか確認してから、次の印刷に進んでください。', 'unknown');
+text('case-weight-label', `ケース重量${CASE_WEIGHT_G}gを差し引いて自動計算`);
+text('weight-range', `正味重量 ${minG}〜${maxG}g（スケール重量 ${minG+CASE_WEIGHT_G}〜${maxG+CASE_WEIGHT_G}g／ケース${CASE_WEIGHT_G}g）`);
+if (activeUncertain(records)) result('前回の印刷結果を確認してください', activeUncertain(records).detail || 'ラベルが1枚出たか確認してから、次の印刷に進んでください。', 'unknown');
 initializeCloud();
 window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => {
@@ -713,7 +738,7 @@ $('scale-disconnect').addEventListener('click',()=>{if(!busy&&!demo)return scale
 $('scale-arm').addEventListener('click',()=>{if(busy||demo||activeUncertain(currentRows()))return;scaleDevice.resetFrame();scaleSession.arm();renderScale();});
 $('weight-mode').addEventListener('change',()=>{
   if(busy||demo||activeUncertain(currentRows()))return;
-  scaleMode=$('weight-mode').value==='manual'?'manual':'usb';$('weight').value='';
+  scaleMode=$('weight-mode').value==='manual'?'manual':'usb';$('scale-weight').value='';$('weight').value='';
   scaleDevice.resetFrame();scaleSession.pause('「次の計量を開始」から計量してください。');renderScale({preview:true});
 });
 setInterval(()=>{if(scaleSession.expire()&&!busy)renderScale({preview:true});},500);

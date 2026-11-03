@@ -1,4 +1,10 @@
-import {WEIGHT_RULE} from './config.mjs';
+import {WEIGHT_RULE, CASE_WEIGHT_G} from './config.mjs';
+
+export function netWeightFromGross(rawGross, caseWeightG = CASE_WEIGHT_G) {
+  const value = rawGross == null ? '' : String(rawGross).trim();
+  if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || !Number.isSafeInteger(caseWeightG) || caseWeightG < 0) return null;
+  return Number(value) - caseWeightG;
+}
 
 export function weightLimits(rule = WEIGHT_RULE) {
   if (!rule || !Number.isSafeInteger(rule.baseWeightG) || rule.baseWeightG <= 0 ||
@@ -11,7 +17,7 @@ export function weightLimits(rule = WEIGHT_RULE) {
 export function assessWeight(raw, rule = WEIGHT_RULE) {
   const {minG, maxG} = weightLimits(rule);
   const value = raw == null ? '' : String(raw).trim();
-  if (!value) return {status:'empty', accepted:false, message:'正味重量を入力してください。', minG, maxG};
+  if (!value) return {status:'empty', accepted:false, message:'正味重量を取得してください。', minG, maxG};
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
     return {status:'invalid', accepted:false, message:'重量はg単位の正の整数で入力してください。', minG, maxG};
   }

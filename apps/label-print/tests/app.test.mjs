@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import * as transport from '../public/transport.mjs';
 import * as connection from '../public/connection.mjs';
 import * as production from '../public/production.mjs';
-import {WEIGHT_RULE} from '../public/config.mjs';
+import {WEIGHT_RULE, CASE_WEIGHT_G} from '../public/config.mjs';
 import {CLOUD_CONFIG} from '../public/cloud-config.mjs';
 import * as cloud from '../public/cloud.mjs';
 import * as scale from '../public/scale.mjs';
@@ -30,7 +30,6 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([,id]) => [id, new Element()]));
   elements.set('result-icon', new Element());
   const get = id => { assert.ok(elements.has(id), `Missing HTML id: ${id}`); return elements.get(id); };
-  get('copies').value = '1';
   const documentListeners = {};
   const document = {
     visibilityState: 'visible',
@@ -62,7 +61,7 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   }
   let nextRecordId = 0;
   const context = vm.createContext({
-    ...transport, ...connection, ...production, ...cloud, ...scale, WEIGHT_RULE, CLOUD_CONFIG, document, navigator: {userAgent: 'Android'},
+    ...transport, ...connection, ...production, ...cloud, ...scale, WEIGHT_RULE, CASE_WEIGHT_G, CLOUD_CONFIG, document, navigator: {userAgent: 'Android'},
     window: {addEventListener() {},sessionStorage:{getItem:k=>sessions.get(k),setItem:(k,v)=>sessions.set(k,v),removeItem:k=>sessions.delete(k)}}, localStorage: {setItem:(k,v)=>storage.set(k,v), getItem:k=>storage.get(k) || null,removeItem:k=>storage.delete(k)},
     DOMParser: FixtureDOMParser, crypto: {randomUUID: () => `test-record-${++nextRecordId}`}, fetch:fetchImpl,
     setTimeout:(fn,ms)=>ms===5000 ? 0 : setTimeout(fn,ms), setInterval:()=>0, clearTimeout, URL:ExportURL, URLSearchParams, Blob, Intl, Date, AbortController,
@@ -76,7 +75,7 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
     get,
     click: id => get(id).listeners.click(),
     print: () => get('label-form').listeners.submit({preventDefault(){}}),
-    fill: () => { get('flavor').value='ピスタチオ'; get('staff').value='製造担当'; get('weight').value='2000'; },
+    fill: () => { get('flavor').value='ピスタチオ'; get('staff').value='製造担当'; get('scale-weight').value='2150'; get('scale-weight').listeners.input(); },
     visibility: async state => { document.visibilityState=state; await documentListeners.visibilitychange(); },
     rows: () => JSON.parse(storage.get('imo-print-station-v1:history')),
     stored: key => storage.get(key),
@@ -86,6 +85,7 @@ function setup(fetchImpl, {bundled = false, cloudSession = null, initialRows = n
   };
 }
 function reply(raw = success) { return {ok:true, type:'cors', text:async()=>raw}; }
+function setGross(app, value) { app.get('scale-weight').value = String(value); app.input('scale-weight'); }
 
 test('production release retains existing history, preferences and Sheets settings without importing test rows', async()=>{
   const row={id:'existing-production-record',flavor:'ミルク',staff:'従来担当',copies:1,weightG:2020,weightSource:'manual',
@@ -111,45 +111,58 @@ test('an interrupted production print remains locked after the scale release unt
     createdAt:'2026-10-28T01:00:00.000Z',manufacturedAt:'2026-10-28T01:00:00.000Z',lastAttemptAt:'2026-10-28T01:00:00.000Z'};
   let requests=0;
   const app=setup(async()=>{requests++;return reply();},{automatic:true,initialRows:[pending]});
-  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
   await app.print();
   assert.equal(app.rows()[0].status,'unknown');assert.equal(app.get('print-button').disabled,true);
   assert.equal(app.get('scale-arm').disabled,true);assert.equal(app.get('reconcile').hidden,false);assert.equal(requests,0);
   await app.click('confirm-printed');assert.equal(app.rows()[0].status,'confirmed');assert.equal(requests,0);
 });
 
-test('USB sample automatically fills net weight, freezes scale provenance in label and Sheets log, and requires next case',async()=>{
+test('USB gross 2200g shows net 2050g, prints one label, and requires a fresh next case',async()=>{
   const requests=[],logs=[];
   const app=setup(async(url,options)=>{
     if(String(url).startsWith('http://localhost')){requests.push(new URL(url));return reply();}
     const body=JSON.parse(options.body);logs.push(body.record);return {ok:true,json:async()=>({ok:true,protocol:body.protocol,requestId:body.requestId,spreadsheetId:body.spreadsheetId,id:body.record.id,revision:body.record.client_revision})};
   },{automatic:true,cloudSession:true});
   app.get('flavor').value='ミルク';app.get('staff').value='担当者';
-  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
-  assert.equal(app.get('weight').value,'2050');assert.equal(app.get('weight').readOnly,true);
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
+  assert.equal(app.get('scale-weight').value,'2200');assert.equal(app.get('weight').value,'2050');assert.equal(app.get('weight').readOnly,true);
   await app.print();await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味：2050 g');
-  assert.equal(app.rows()[0].weightSource,'scale-usb');assert.equal(app.rows()[0].tareG,334);
+  assert.equal(app.rows()[0].weightSource,'scale-usb');assert.equal(app.rows()[0].tareG,0);
+  assert.equal(app.rows()[0].grossWeightG,2200);assert.equal(app.rows()[0].caseWeightG,150);
+  assert.equal(app.rows()[0].copies,1);
   assert.equal(logs[0].weight_g,2050);assert.equal(logs[0].weight_source,'scale-usb');
   assert.equal(app.get('weight').value,'');assert.equal(app.get('print-button').disabled,true);
   assert.equal(app.get('preview-weight').textContent,'2050 g');
-  app.simulate('scaleSession.accept({weightG:2100,tareG:334});renderScale();');
+  app.simulate('scaleSession.accept({weightG:2250,tareG:0});renderScale();');
   await app.print();assert.equal(requests.length,1);
-  app.click('scale-arm');app.simulate('scaleSession.accept({weightG:2000,tareG:334});renderScale({preview:true});');
+  app.click('scale-arm');app.simulate('scaleSession.accept({weightG:2150,tareG:0});renderScale({preview:true});');
   await app.print();assert.equal(requests.length,2);
 });
 test('direct submit cannot bypass stale/disconnected/tampered USB capture; switching mode clears weight',async()=>{
   let prints=0;const app=setup(async()=>{prints++;return reply();},{automatic:true});
   app.fill();await app.print();assert.equal(prints,0);
-  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
   app.get('weight').value='2100';await app.print();assert.equal(prints,0);
   app.simulate('scaleSession.disconnect();renderScale();');await app.print();assert.equal(prints,0);assert.equal(app.get('weight').value,'');
-  app.get('weight-mode').value='manual';app.get('weight-mode').listeners.change();assert.equal(app.get('weight').readOnly,false);
-  app.get('weight').value='2050';await app.print();assert.equal(prints,1);assert.equal(app.rows()[0].weightSource,'manual');
+  app.get('weight-mode').value='manual';app.get('weight-mode').listeners.change();assert.equal(app.get('scale-weight').readOnly,false);
+  setGross(app,2200);await app.print();assert.equal(prints,1);assert.equal(app.rows()[0].weightSource,'manual');
+});
+test('a remaining tare blocks printing instead of subtracting the case twice',async()=>{
+  let prints=0;const app=setup(async()=>{prints++;return reply();},{automatic:true});
+  app.fill();
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:334});renderScale({preview:true});');
+  assert.equal(app.get('scale-weight').value,'');assert.equal(app.get('weight').value,'');
+  assert.match(app.get('weight-judgment').textContent,/風袋/);
+  await app.print();assert.equal(prints,0);
+  app.simulate('scaleSession.accept({weightG:2250,tareG:0});renderScale({preview:true});');
+  assert.equal(app.get('weight').value,'2100');
+  await app.print();assert.equal(prints,1);
 });
 test('screen hiding invalidates captured weight and demo cannot consume real USB readings',async()=>{
   const app=setup(async()=>reply(),{automatic:true});
-  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2050,tareG:334});renderScale({preview:true});');
+  app.simulate('scaleSession.connect();scaleSession.accept({weightG:2200,tareG:0});renderScale({preview:true});');
   await app.visibility('hidden');assert.equal(app.get('weight').value,'');assert.equal(app.get('print-button').disabled,true);
   await app.click('demo-toggle');app.fill();await app.print();assert.deepEqual(app.rows(),[]);
   await app.click('demo-toggle');assert.equal(app.get('weight').value,'');
@@ -158,7 +171,7 @@ test('screen hiding invalidates captured weight and demo cannot consume real USB
 test('classic browser bundle runs the actual weight/print flow without ES module loading', async () => {
   const requests = [];
   const app = setup(async url => { requests.push(new URL(url)); return reply(); }, {bundled:true});
-  app.fill(); app.get('weight').value='2050'; await app.print();
+  app.fill(); setGross(app,2200); await app.print();
   assert.equal(requests.length,1);
   assert.equal(requests[0].searchParams.get('text_FLAVOR'),'ピスタチオ');
   assert.equal(requests[0].searchParams.get('text_WEIGHT'),'正味：2050 g');
@@ -230,25 +243,26 @@ test('out-of-range or invalid manual weight cannot be saved or sent even by dire
   let count = 0;
   const app = setup(async () => { count++; return reply(); });
   app.fill();
-  for (const weight of ['', '1999', '2101', '-2000', '2000.5', '2e3']) {
-    app.get('weight').value = weight; app.input('weight');
+  for (const weight of ['', '2149', '2251', '-2000', '2150.5', '2e3']) {
+    setGross(app,weight);
     assert.equal(app.get('print-button').disabled, true);
     await app.print();
   }
   assert.equal(count, 0); assert.deepEqual(app.rows(), []);
-  app.get('weight').value = '2100'; app.input('weight');
+  setGross(app,2250);
   assert.equal(app.get('print-button').disabled, false);
   await app.print();
   assert.equal(count, 1);
   assert.equal(app.rows()[0].weightG, 2100);
 });
 
-test('a single frozen timestamp and weight are used in print, history and preview; next weight is blank', async () => {
+test('a single frozen timestamp and net weight are used in print, history and preview; next weight is blank', async () => {
   let printed;
   const app = setup(async url => { printed = new URL(url); return reply(); });
-  app.fill(); app.get('weight').value = '2050'; await app.print();
+  app.fill(); setGross(app,2200); await app.print();
   const row = app.rows()[0];
   assert.equal(row.weightG, 2050); assert.equal(row.weightSource, 'manual');
+  assert.equal(row.grossWeightG,2200);assert.equal(row.caseWeightG,150);assert.equal(row.copies,1);
   assert.deepEqual(row.weightRule, {baseWeightG:2000,upperTolerancePercent:5});
   assert.equal(row.judgment, 'pass');
   assert.equal(row.manufacturedAt, row.createdAt);
@@ -266,10 +280,10 @@ test('operator-confirmed missing print retries the same timestamp and weight rat
     if (requests.length === 1) throw new TypeError('Lost response');
     return reply();
   });
-  app.fill(); app.get('weight').value = '2090'; await app.print();
+  app.fill(); setGross(app,2240); await app.print();
   const original = app.rows()[0];
   await app.click('confirm-not-printed');
-  app.get('weight').value = '2000';
+  setGross(app,2150);
   const retry = app.history()[0].children[1].children.find(node => node.textContent === '同じ内容を再発行');
   await retry.listeners.click();
   assert.equal(requests.length, 2);
@@ -282,7 +296,7 @@ test('operator-confirmed missing print retries the same timestamp and weight rat
 
 test('CSV includes the frozen manufacture time, manual weight and rule; name uses the JST day', async () => {
   const app = setup(async () => reply());
-  app.fill(); app.get('weight').value='2080'; app.get('staff').value='=1+1'; await app.print();
+  app.fill(); setGross(app,2230); app.get('staff').value='=1+1'; await app.print();
   const row = app.rows()[0], csv = await app.exportFile();
   assert.match(csv.text, /製造日時_日本時間/);
   assert.match(csv.text, /正味重量g/);
@@ -357,7 +371,7 @@ test('a stalled cloud upload does not hold the next print button or delay a seco
   },{bundled:true,cloudSession});
   app.fill(); await app.print(); await settleCloud();
   assert.equal(typeof release,'function');
-  app.fill(); app.input('weight');
+  app.fill(); app.input('scale-weight');
   assert.equal(app.get('print-button').disabled,false);
   await app.print();
   assert.equal(prints,2);

@@ -22,6 +22,7 @@
 #label-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 28px}
 #label-form>div{min-width:0}
 #label-form .field-row,#label-form .weight-field{margin-top:0}
+#label-form .field-row{grid-template-columns:1fr}
 .print-actions{display:flex;flex-direction:column;justify-content:center}
 .print-actions .retain-note{margin:0 0 18px}
 .print-actions .button-note{margin:10px 0 0}
@@ -35,6 +36,8 @@
 .scale-mode label{margin:0;white-space:nowrap;font-size:11px}
 .scale-mode select{width:auto;min-height:38px;margin:0;padding:4px 8px;font-size:12px}
 .weight-input input[readonly]{background:#f1f4ee;color:#243d26}
+.net-weight-field{margin-top:18px}
+.net-weight-field label{flex-wrap:wrap}
 .paper-label{min-height:0}
 .paper-label>strong{font-size:30px;font-weight:800;line-height:1.2;padding:0 0 12px}
 .label-date{font-size:14px;line-height:1.4;margin-bottom:5px;font-variant-numeric:tabular-nums}

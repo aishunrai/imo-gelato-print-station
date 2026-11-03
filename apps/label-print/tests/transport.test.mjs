@@ -29,6 +29,11 @@ test('rejects blank, fractional and out-of-range counts before any print request
   assert.throws(() => validateLabel({...label,flavor:'未登録'}));
   assert.equal(validateLabel({...label,copies:50}).copies,50);
 });
+test('new records require gross minus recorded case weight to equal printed net weight', () => {
+  assert.equal(validateLabel({...label,grossWeightG:2150,caseWeightG:150}).weightG,2000);
+  assert.throws(()=>validateLabel({...label,grossWeightG:2150,caseWeightG:150,weightG:2050}),/一致しません/);
+  assert.throws(()=>validateLabel({...label,grossWeightG:2150,caseWeightG:150,weightSource:'scale-usb',tareG:100,weightReceivedAt:'2026-10-15T05:35:00.000Z'}),/風袋設定/);
+});
 test('sends exactly one readable CORS request without navigation or custom headers', async () => {
   let count=0;
   const r = await requestPrinter('print', label, {fetchImpl:async (url, opts) => {
