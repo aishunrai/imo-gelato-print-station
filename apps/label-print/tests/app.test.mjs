@@ -91,9 +91,10 @@ function setGross(app, value) { app.get('scale-weight').value = String(value); a
 test('idle preparation message is hidden while print feedback remains visible',async()=>{
   const app=setup(async()=>reply());
   assert.equal(app.get('result').hidden,true);
+  assert.equal(app.get('weight-judgment').hidden,true);
   await app.click('demo-toggle');assert.equal(app.get('result').hidden,true);
   await app.click('demo-toggle');assert.equal(app.get('result').hidden,true);
-  app.fill();await app.print();
+  app.fill();assert.equal(app.get('weight-judgment').hidden,false);await app.print();
   assert.equal(app.get('result').hidden,false);
   assert.equal(app.get('result-title').textContent,'ラベルの印刷が完了しました');
 });

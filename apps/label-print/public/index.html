@@ -50,7 +50,7 @@
             <option value="黒胡麻きなこ">黒胡麻きなこ</option>
           </select></div>
           <div class="field-row"><div><label for="staff">担当者<span>必須</span></label><input id="staff" name="staff" type="text" maxlength="40" placeholder="担当者名" autocomplete="name" required></div></div>
-          <div class="weight-field"><div class="weight-grid"><div class="gross-weight-field"><div class="weight-heading"><label for="scale-weight">スケール重量</label><div class="scale-mode"><label for="weight-mode">取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div></div><div class="weight-input"><input id="scale-weight" name="scale-weight" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" aria-describedby="weight-range weight-judgment" required readonly><span>g</span></div></div><div class="net-weight-field"><label for="weight">正味重量</label><div class="weight-input"><input id="weight" name="weight" type="number" inputmode="numeric" placeholder="自動計算" readonly><span>g</span></div></div></div><p id="weight-range"></p><p id="weight-judgment" class="weight-judgment" role="status" aria-live="polite" data-state="empty">正味重量を取得してください。</p></div>
+          <div class="weight-field"><div class="weight-grid"><div class="gross-weight-field"><div class="weight-heading"><label for="scale-weight">スケール重量</label><div class="scale-mode"><label for="weight-mode">取得方法</label><select id="weight-mode"><option value="usb">USBで自動取得</option><option value="manual">手入力</option></select></div></div><div class="weight-input"><input id="scale-weight" name="scale-weight" type="number" min="1" step="1" inputmode="numeric" autocomplete="off" aria-describedby="weight-range weight-judgment" required readonly><span>g</span></div></div><div class="net-weight-field"><label for="weight">正味重量</label><div class="weight-input"><input id="weight" name="weight" type="number" inputmode="numeric" placeholder="自動計算" readonly><span>g</span></div></div></div><p id="weight-range"></p><p id="weight-judgment" class="weight-judgment" role="status" aria-live="polite" data-state="empty" hidden></p></div>
           <div class="print-actions">
           <button id="print-button" class="primary" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 9V3h12v6M6 17H4V9h16v8h-2M6 14h12v7H6zM16 11h1"/></svg><span id="print-button-text">ラベルを印刷</span><span class="arrow" aria-hidden="true">↗</span></button>
           <button id="scale-arm" class="secondary next-measure" type="button">次の計量を開始</button>
@@ -80,8 +80,8 @@
     </section>
     <section class="card history-card" aria-labelledby="history-title"><div class="card-heading"><div><h2 id="history-title">この端末の発行履歴</h2><p>この端末の実機印刷を保存し、接続設定後はシートにも同期します。画面確認モードはシートに保存しません。</p></div><button id="export-button" class="text-button" type="button">CSVを保存 ↓</button></div><div id="history-list" class="history-list"><p class="empty">まだ発行履歴はありません。</p></div></section>
     <p id="storage-note" class="storage-note" hidden>端末内の保存ができません。履歴の保存先を確認してから印刷してください。</p>
-    <footer><span>いもんね / GELATO WORKSHOP</span><span>ラベル印刷 v0.8.3</span></footer>
+    <footer><span>いもんね / GELATO WORKSHOP</span><span>ラベル印刷 v0.8.4</span></footer>
   </main>
-  <script defer src="app.bundle.js?v=20261103-copy-cleanup"></script>
+  <script defer src="app.bundle.js?v=20261103-empty-state"></script>
 </body>
 </html>

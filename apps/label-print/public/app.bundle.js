@@ -557,9 +557,9 @@ function snapshot() {
 function renderWeight() {
   const judgment = assessWeight($('weight').value);
   const tareLeft = usingScale() && scaleSession.reading && scaleSession.reading.tareG !== 0;
+  $('weight-judgment').hidden = !tareLeft && judgment.status === 'empty';
   $('weight-judgment').dataset.state = tareLeft ? 'invalid' : judgment.status;
-  text('weight-judgment', tareLeft ? scaleSession.reason
-    : usingScale() && judgment.status==='empty' ? 'スケールから重量を取得してください。' : judgment.message);
+  text('weight-judgment', tareLeft ? scaleSession.reason : judgment.status === 'empty' ? '' : judgment.message);
   updateControls();
 }
 function updatePreview() {
